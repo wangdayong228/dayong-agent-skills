@@ -1,19 +1,17 @@
 # dayong-agent-skills
 
-Portable agent skills shared across coding agents.
+面向多种编码代理共享的可复用 skills 仓库。
 
-This repository keeps reusable workflow skills in the open Agent Skills layout:
-each skill is a directory under `skills/` with a `SKILL.md` file and optional
-agent-specific metadata. The source of truth is the portable `SKILL.md`; any
-agent-specific files are optional helpers, not the primary format.
+本仓库采用开放 Agent Skills 布局：每个 skill 位于 `skills/` 下的独立目录，
+并以 `SKILL.md` 作为唯一事实来源（source of truth）。
 
-## Included Skills
+## 已包含的 Skills
 
-- `affected-path-review` - expands code review from changed lines to the full affected behavior path.
-- `pr-comment-review` - fetches, evaluates, and addresses GitHub PR review feedback.
-- `iterative-code-review` - runs a bounded subagent review loop where the main agent evaluates and fixes verified issues.
+- `affected-path-review`：将代码审查从“改动行”扩展到“完整受影响行为路径”。
+- `pr-comment-review`：拉取、评估并处理 GitHub PR 评审意见。
+- `iterative-code-review`：执行有边界的子代理评审循环，由主代理确认并修复有效问题。
 
-## Repository Layout
+## 仓库结构
 
 ```text
 skills/
@@ -23,67 +21,40 @@ skills/
       openai.yaml
 ```
 
-`agents/openai.yaml` is optional Codex UI metadata. Other agents can ignore it
-and read `SKILL.md` directly.
+`agents/openai.yaml` 为可选元数据文件；跨代理场景优先读取 `SKILL.md`。
 
-## Install For Codex
+## 安装
 
-Codex discovers user skills from `~/.agents/skills`.
+GitHub 仓库：
 
-Use symlinks so local edits and `git pull` updates are immediately reflected:
+- `https://github.com/wangdayong228/dayong-agent-skills.git`
 
-```bash
-repo="$HOME/myspace/mywork/dayong-agent-skills"
-mkdir -p "$HOME/.agents/skills"
-
-ln -sfn "$repo/skills/affected-path-review" "$HOME/.agents/skills/affected-path-review"
-ln -sfn "$repo/skills/pr-comment-review" "$HOME/.agents/skills/pr-comment-review"
-ln -sfn "$repo/skills/iterative-code-review" "$HOME/.agents/skills/iterative-code-review"
-```
-
-Restart Codex or force reload skills if a newly linked skill does not appear.
-
-## Install For Claude Code
-
-Claude Code commonly reads user skills from `~/.claude/skills`.
+使用 `npx skills` 安装（适用于 Codex / Claude Code / Cursor）：
 
 ```bash
-repo="$HOME/myspace/mywork/dayong-agent-skills"
-mkdir -p "$HOME/.claude/skills"
-
-ln -sfn "$repo/skills/affected-path-review" "$HOME/.claude/skills/affected-path-review"
-ln -sfn "$repo/skills/pr-comment-review" "$HOME/.claude/skills/pr-comment-review"
-ln -sfn "$repo/skills/iterative-code-review" "$HOME/.claude/skills/iterative-code-review"
+npx skills add wangdayong228/dayong-agent-skills@affected-path-review
+npx skills add wangdayong228/dayong-agent-skills@pr-comment-review
+npx skills add wangdayong228/dayong-agent-skills@iterative-code-review
 ```
 
-Restart Claude Code or reload skills if needed.
-
-## Use With Cursor
-
-Cursor does not use the same skill discovery path as Codex or Claude Code.
-Use this repository as the source text for Cursor rules:
-
-1. Open the relevant `skills/<skill-name>/SKILL.md`.
-2. Copy the reusable workflow instructions into a Cursor rule.
-3. Keep the rule focused on the workflow and omit agent-specific metadata such as `agents/openai.yaml`.
-
-If Cursor gains direct support for this skill layout later, keep `SKILL.md` as
-the source of truth and add only the smallest required compatibility layer.
-
-## Update
+如需全局安装并自动确认，可加参数 `-g -y`：
 
 ```bash
-cd "$HOME/myspace/mywork/dayong-agent-skills"
-git pull --ff-only
+npx skills add wangdayong228/dayong-agent-skills@affected-path-review -g -y
+npx skills add wangdayong228/dayong-agent-skills@pr-comment-review -g -y
+npx skills add wangdayong228/dayong-agent-skills@iterative-code-review -g -y
 ```
 
-Symlink-based installs pick up updates from the repository automatically. If an
-agent caches skill metadata, restart or reload skills after pulling.
+## 更新
 
-## Authoring Rules
+```bash
+npx skills update
+```
 
-- Keep each skill focused on one job.
-- Put reusable workflow instructions in `SKILL.md`.
-- Keep `description` concise and trigger-oriented.
-- Add scripts or references only when the workflow needs deterministic tooling or heavy reference material.
-- Do not commit secrets, local logs, generated scratch files, or agent session transcripts.
+## 编写规范
+
+- 每个 skill 聚焦单一职责。
+- 可复用流程统一写入 `SKILL.md`。
+- `description` 保持简洁，突出触发条件。
+- 仅在确有需要时添加脚本或大型参考资料。
+- 不要提交密钥、本地日志、临时生成文件或会话转录。
