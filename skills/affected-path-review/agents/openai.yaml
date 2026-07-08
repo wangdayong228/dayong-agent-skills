@@ -1,0 +1,4 @@
+interface:
+  display_name: "Affected Path Review"
+  short_description: "Review affected behavior paths, not just changed lines."
+  default_prompt: "Use affected-path-review to expand code review scope from changed files to the full affected behavior/data path."

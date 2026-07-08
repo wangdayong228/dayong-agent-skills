@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Comment Review"
+  short_description: "Fetch and evaluate PR comments"
+  default_prompt: "Get the latest PR comments, evaluate whether they are actionable, and fix verified issues."

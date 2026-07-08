@@ -1,0 +1,4 @@
+interface:
+  display_name: "Iterative Code Review"
+  short_description: "Run bounded subagent review loops"
+  default_prompt: "Use $iterative-code-review to run a bounded subagent code review loop and fix verified issues."
