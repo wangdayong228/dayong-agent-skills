@@ -7,9 +7,15 @@
 
 ## 已包含的 Skills
 
-- `affected-path-review`：将代码审查从“改动行”扩展到“完整受影响行为路径”。
-- `pr-comment-review`：拉取、评估并处理 GitHub PR 评审意见。
-- `iterative-code-review`：执行有边界的子代理评审循环，由主代理确认并修复有效问题。
+安装后，代理会根据 `SKILL.md` 的 `description` 自动匹配场景并加载 skill（非系统硬 hook，偶发可能漏触发）。
+
+| Skill | 默认触发场景 |
+| --- | --- |
+| `affected-path-review` | 任何 code review、PR review、review 子代理或 review comments 处理；将审查范围从 diff 扩展到完整行为路径 |
+| `pr-comment-review` | 拉取、评估、处理或汇总 GitHub PR 评论与可执行的 review thread |
+| `iterative-code-review` | 要求子代理/AI reviewer 审查本地改动，并由主代理循环修复直至通过 |
+
+例外：若你明确要求 `diff-only review`，则只审查 diff，不必按 `affected-path-review` 扩展到完整行为路径。
 
 ## 仓库结构
 
@@ -25,19 +31,25 @@ skills/
 
 ## 安装
 
-GitHub 仓库：
+GitHub 仓库：`https://github.com/wangdayong228/dayong-agent-skills.git`
 
-- `https://github.com/wangdayong228/dayong-agent-skills.git`
+使用 `npx skills` 安装（适用于 Codex / Claude Code / Cursor）。
 
-使用 `npx skills` 安装（适用于 Codex / Claude Code / Cursor）：
+**一次安装全部：**
 
 ```bash
-npx skills add wangdayong228/dayong-agent-skills@affected-path-review
-npx skills add wangdayong228/dayong-agent-skills@pr-comment-review
-npx skills add wangdayong228/dayong-agent-skills@iterative-code-review
+npx skills add wangdayong228/dayong-agent-skills --all -g -y
 ```
 
-如需全局安装并自动确认，可加参数 `-g -y`：
+**安装单个 skill（`--skill` 写法）：**
+
+```bash
+npx skills add wangdayong228/dayong-agent-skills --skill affected-path-review -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill pr-comment-review -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill iterative-code-review -g -y
+```
+
+**安装单个 skill（`@` 简写）：**
 
 ```bash
 npx skills add wangdayong228/dayong-agent-skills@affected-path-review -g -y
