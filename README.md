@@ -15,7 +15,7 @@
 | `pr-comment-review` | 拉取、评估、处理或汇总 GitHub PR 评论与可执行的 review thread |
 | `iterative-code-review` | 要求子代理/AI reviewer 审查本地改动，并由主代理循环修复直至通过 |
 
-例外：若你明确要求 `diff-only review`，则只审查 diff，不必按 `affected-path-review` 扩展到完整行为路径。
+例外：若你明确要求 `diff-only review`，则只审查 diff，不会按 `affected-path-review` 扩展到完整行为路径。
 
 ## 仓库结构
 
