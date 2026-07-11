@@ -25,7 +25,7 @@ Deliver **source artifacts** (Tier A/B) plus one **derived** report (Tier C). Sc
 
 | Tier | Location | What | Cite as evidence? | Conflict rank |
 | --- | --- | --- | --- | --- |
-| A raw | `source/raw/` | HTTP bytes from docs domain (openapi.json, llms.txt) | Yes | 1 |
+| A raw | `source/raw/` | HTTP bytes from docs domain (openapi.json, openrpc.json, llms.txt) | Yes | 1 |
 | B snapshots | `source/snapshots/` | ego-browser page captures (snapshotText) | Yes | 2 |
 | B snapshots | `.firecrawl/` | Firecrawl fallback captures (keep default filenames) | Yes | 3 |
 | C derived | `docs/api-source-report.md` | Agent-written index | No | — |
@@ -71,14 +71,17 @@ Stop when every checklist item is `sourced`, `missing_from_docs`, or `unreachabl
 ## Workflow
 
 1. **Dialect** — REST → OpenAPI 3.x; JSON-RPC → OpenRPC 1.x
-2. **Probe Tier A** — `serverFetch` `/openapi.json`, `/swagger.json`, `/llms.txt` → `source/raw/`. **Pin and exit only** when a **complete, trusted** machine-readable spec is confirmed (see below). Otherwise continue discovery.
+2. **Probe Tier A** — per dialect, `serverFetch` → `source/raw/`:
+   - OpenAPI: `/openapi.json`, `/swagger.json`, `/llms.txt`
+   - OpenRPC: `/openrpc.json`, `/llms.txt`
+   **Pin and short-circuit discovery** (skip steps 3–6) only when a **complete, trusted** spec is confirmed (see below). **Always** complete step 7 — write `docs/api-source-report.md` with Gate **GO** and the pinned spec in Source Index. Otherwise continue discovery.
 3. **Discovery** — ego-browser entry URL; walk sidebar, index, version switcher, cross-links; classify URLs (Page Scope); optional `firecrawl-map`
 4. **Fetch** — per Capture by Page Type → `source/raw/` or `source/snapshots/` (ego-browser); Firecrawl fallback → `.firecrawl/` (still Tier B). Expand hidden content; chase cross-refs into frontier
 5. **Coverage** — each checklist item: `sourced` (`path:line`), `missing_from_docs`, or `unreachable`; flag `unresolved_ref`
 6. **Loop** — gaps → step 3 if `round < 5`; two fetch failures → `unreachable`; blocking gaps → **NO-GO** unless user approves partial scope
 7. **Report** — write `docs/api-source-report.md` per `references/report-template.md`
 
-**Complete, trusted spec (step 2 exit criteria):** all must pass before pin-and-exit — (1) parses as valid OpenAPI 3.x or OpenRPC 1.x; (2) covers the in-scope endpoints/operations (cross-check `llms.txt` or docs index when available); (3) not obviously partial (empty `paths`, single operation when docs list many, version mismatch); (4) user has not flagged it stale/unverified. Any doubt → treat as incomplete and continue discovery.
+**Complete, trusted spec (step 2 short-circuit criteria):** all must pass before skipping discovery — (1) parses as valid OpenAPI 3.x or OpenRPC 1.x; (2) covers the in-scope endpoints/operations or RPC methods (cross-check `llms.txt` or docs index when available); (3) not obviously partial (empty `paths`/`methods`, single operation when docs list many, version mismatch); (4) user has not flagged it stale/unverified. Any doubt → treat as incomplete and continue discovery. Short-circuit still requires step 7 report — never finish without `docs/api-source-report.md`.
 
 ## Page Scope
 
@@ -113,7 +116,7 @@ Forbidden without Tier A/B text: infer types from examples; invent enums; assume
 | "Example shows string" → examples ≠ schema |
 | "Live API confirms field" → guessing unless user approved |
 
-**STOP:** citing report alone; Firecrawl-only when ego-browser available; writing openapi.yaml before **GO**; stopping with unexplored sidebar/cross-refs; open `unresolved_ref` marked complete.
+**STOP:** citing report alone; Firecrawl-only when ego-browser available; writing openapi.yaml before **GO**; stopping with unexplored sidebar/cross-refs; open `unresolved_ref` marked complete; finishing without `docs/api-source-report.md`.
 
 Do not substitute memory, training data, or third-party specs for missing sources.
 
