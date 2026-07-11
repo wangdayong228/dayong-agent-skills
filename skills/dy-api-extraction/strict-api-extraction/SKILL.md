@@ -86,11 +86,11 @@ Stop when every checklist item is `sourced`, `missing_from_docs`, or `unreachabl
 2. **Probe Tier A** — per dialect, `serverFetch` → `source/raw/`:
    - OpenAPI: `/openapi.json`, `/swagger.json`, `/llms.txt`
    - OpenRPC: `/openrpc.json`, `/llms.txt`
-   **Pin and short-circuit discovery** (skip steps 3–6 page fetch loop) only when a **complete, trusted** spec is confirmed (see below). **Always** run step 5 Coverage against the pinned spec, then step 7. If step 5 finds in-scope checklist gaps that require documentation **outside** the pinned spec, **resume discovery** (steps 3–6) — do not mark `missing_from_docs` without exhaustive search. Gate **GO** only if every in-scope checklist item is `sourced` from Tier A/B or explicitly `missing_from_docs`/`unreachable`.
+   **Pin and short-circuit discovery** (skip steps 3–6 page fetch loop) only when a **complete, trusted** spec is confirmed (see below). **Always** run step 5 Coverage against the pinned spec, then step 7. If step 5 finds in-scope checklist gaps that require documentation **outside** the pinned spec, **resume discovery** (steps 3–6; round counter continues, does not reset) — do not mark `missing_from_docs` without exhaustive search. Gate **GO** only if every in-scope checklist item is `sourced` from Tier A/B or explicitly `missing_from_docs`/`unreachable`.
 3. **Discovery** — ego-browser entry URL; walk sidebar, index, version switcher, cross-links; classify URLs (Page Scope); optional `firecrawl-map`
 4. **Fetch** — per Capture by Page Type → `source/raw/` or `source/snapshots/` (ego-browser); Firecrawl fallback → `.firecrawl/` (still Tier B). Expand hidden content; chase cross-refs into frontier
-5. **Coverage** — each checklist item: `sourced` (`path:line`), `missing_from_docs`, or `unreachable`; flag pending cross-ref URLs as `unresolved_ref`
-6. **Loop** — checklist gaps, pending cross-ref `unresolved_ref`, or frontier URLs → step 3 if `round < 5`; at `round >= 5`, reclassify per Loop Contract then proceed to step 7; two fetch failures → `unreachable`; any `round_limit_deferred` → **NO-GO** unless user explicitly approves reduced scope
+5. **Coverage** — each checklist item: `sourced` (`path:line`), `missing_from_docs`, `unreachable`, `N/A` (not applicable, e.g. GET has no body), or `out_of_scope` (user-approved reduced scope); flag pending cross-ref URLs as `unresolved_ref`
+6. **Loop** — checklist gaps, pending cross-ref `unresolved_ref`, or frontier URLs → step 3 if `round < 5`; at `round >= 5`, reclassify per Loop Contract then proceed to step 7; two fetch failures → `unreachable`; any `round_limit_deferred` → **NO-GO** unless user explicitly approves reduced scope (update Summary `Scope`, mark affected checklist items `out_of_scope`, keep deferred URLs in Unresolved Items)
 7. **Report** — write `docs/api-source-report.md` per `references/report-template.md`
 
 **Complete, trusted spec (step 2 short-circuit criteria):** all must pass before skipping discovery — (1) parses as valid OpenAPI 3.x or OpenRPC 1.x; (2) covers the in-scope endpoints/operations or RPC methods (cross-check `llms.txt` or docs index when available); (3) not obviously partial (empty `paths`/`methods`, single operation when docs list many, version mismatch); (4) user has not flagged it stale/unverified. Any doubt → treat as incomplete and continue discovery. Short-circuit still requires step 7 report — never finish without `docs/api-source-report.md`.
@@ -99,11 +99,11 @@ Stop when every checklist item is `sourced`, `missing_from_docs`, or `unreachabl
 
 **Include:** endpoints, schemas/types, auth, errors, webhooks, rate limits affecting contract, enum/symbol reference pages.
 
-**Exclude:** tutorials, SDK-only examples, changelogs, marketing — unless they define schema elements.
+**Exclude:** tutorials, SDK-only examples, changelogs, marketing — unless they define schema elements. Overview/index pages: use for discovery only; chase cross-refs into frontier rather than treating as final evidence.
 
 ## Coverage Checklist
 
-Every item: `sourced`, `missing_from_docs`, or `unreachable`.
+Every item: `sourced`, `missing_from_docs`, `unreachable`, `N/A`, or `out_of_scope`.
 
 | Element | Required evidence |
 | --- | --- |
@@ -137,5 +137,5 @@ Do not substitute memory, training data, or third-party specs for missing source
 
 Write **`docs/api-source-report.md`** (Tier C) using `references/report-template.md`.
 
-**GO** = every in-scope item `sourced` from Tier A/B or explicitly `missing_from_docs`/`unreachable` with user approval where needed; no pending cross-ref `unresolved_ref`; no `round_limit_deferred`. **Evidence conflicts** (Tier A vs B disagree): cite the **winning tier** (rank 1 > 2 > 3) in Coverage Report `path:line`, and record the conflict in Unresolved Items with both ranks — conflicts do not block **GO**.  
-**NO-GO** = blocking `missing_from_docs` for required schema elements; or any `round_limit_deferred` without user-approved reduced scope.
+**GO** = every in-scope item `sourced` from Tier A/B, `N/A`, `out_of_scope` (user-approved reduced scope), or `missing_from_docs`/`unreachable` only after exhaustive search; no pending cross-ref `unresolved_ref`; no `round_limit_deferred` unless user approved reduced scope (Scope updated, deferred items `out_of_scope`). **Evidence conflicts** (Tier A vs B disagree): cite the **winning tier** (rank 1 > 2 > 3) in Coverage Report `path:line`, and record the conflict in Unresolved Items with both ranks — conflicts do not block **GO**.  
+**NO-GO** = blocking `missing_from_docs` for required in-scope elements; or any `round_limit_deferred` without user-approved reduced scope.

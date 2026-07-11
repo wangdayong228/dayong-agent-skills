@@ -62,7 +62,7 @@ npx skills add wangdayong228/dayong-agent-skills@affected-path-review -g -y
 npx skills add wangdayong228/dayong-agent-skills@pr-comment-review -g -y
 npx skills add wangdayong228/dayong-agent-skills@iterative-code-review -g -y
 npx skills add wangdayong228/dayong-agent-skills@strict-api-extraction -g -y
-# strict-api-extraction 还需单独安装 ego-browser（必需）
+# strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 ```
 
 ## 更新
