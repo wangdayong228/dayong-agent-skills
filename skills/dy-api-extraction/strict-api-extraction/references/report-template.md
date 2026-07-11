@@ -21,7 +21,10 @@
 | Element | Status | Source (Tier A/B path:line) | Notes |
 | --- | --- | --- | --- |
 | GET /users | sourced | source/snapshots/users.md:117 | |
+| Request body (GET) | N/A | — | GET has no body |
+| Authentication | unreachable | — | login wall; blocks GO |
 | User.email type | missing_from_docs | — | exhaustive search completed |
+| [deferred endpoint] | out_of_scope | — | user-approved reduced scope |
 
 ## Unresolved Items
 | Item | Status | Conflict rank | Notes |
