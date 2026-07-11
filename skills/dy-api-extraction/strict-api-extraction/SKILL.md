@@ -46,9 +46,21 @@ tier: B
 ---
 ```
 
+## Prerequisites
+
+Install these skills separately — they are not bundled in this repo:
+
+| Skill | Required | Role |
+| --- | --- | --- |
+| `ego-browser` | **Yes** | Primary fetch (`serverFetch`, `snapshotText`) |
+| `firecrawl-scrape` | No | Tier B fallback for static/spa/interactive pages |
+| `firecrawl-map` | No | Bulk URL discovery |
+
+If `ego-browser` is unavailable, write a **NO-GO** report stating the blocker — do not substitute WebFetch or Cursor browser MCP.
+
 ## Capture by Page Type
 
-**REQUIRED:** Load `ego-browser` before discovery or fetch. Do not substitute WebFetch or Cursor browser MCP. If ego-browser is unavailable, write a **NO-GO** report stating the blocker — do not invent tool calls or silent-fail. Load `firecrawl-scrape` / `firecrawl-map` only as needed.
+**REQUIRED:** Load `ego-browser` before discovery or fetch. Load `firecrawl-scrape` / `firecrawl-map` only as needed.
 
 Classify each URL, pick first-try tool, record `page_type`. Two failed attempts → fallback or `unreachable`.
 
@@ -64,9 +76,9 @@ Firecrawl is auxiliary only — bulk URL map (`firecrawl-map`) and Tier B fallba
 
 ## Loop Contract
 
-At most **5 discovery rounds**. Track: `round`, `frontier`, `sourced`, `unresolved_ref`, `unreachable`, `missing_from_docs`.
+At most **5 discovery rounds**. Track: `round`, `frontier`, `sourced`, `unresolved_ref`, `unreachable`, `missing_from_docs`, `round_limit_deferred`.
 
-Stop when every checklist item is `sourced`, `missing_from_docs`, or `unreachable`, no pending cross-ref `unresolved_ref` remains, and Gate is **GO** or **NO-GO**. Increment `round` each re-entry to Discovery. At round 5: reclassify remaining **pending cross-ref** `unresolved_ref` (URLs not yet fetched) — fetch blocked → `unreachable`; not attempted due to round limit → `missing_from_docs` (note: round limit reached); defer unvisited in-scope frontier URLs the same way. `unreachable` is not `missing_from_docs` — never guess content for unreachable URLs. **Evidence conflicts** (Tier A vs B disagree) are not pending cross-refs — record with conflict rank in Unresolved Items; do not reclassify as `missing_from_docs`.
+Stop when every checklist item is `sourced`, `missing_from_docs`, or `unreachable`, no pending cross-ref `unresolved_ref` remains, and Gate is **GO** or **NO-GO**. Increment `round` each re-entry to Discovery. At round 5: reclassify remaining **pending cross-ref** `unresolved_ref` (URLs not yet fetched) — fetch blocked → `unreachable`; not attempted due to round limit → `round_limit_deferred` (list URL in Unresolved Items; **not** `missing_from_docs`). Defer unvisited in-scope frontier URLs the same way. `unreachable` is not `missing_from_docs` — never guess content for unreachable URLs. **`missing_from_docs` means exhaustive search completed and official docs are silent** — never use it for URLs simply not yet fetched. **Evidence conflicts** (Tier A vs B disagree) are not pending cross-refs — record with conflict rank in Unresolved Items.
 
 ## Workflow
 
@@ -78,7 +90,7 @@ Stop when every checklist item is `sourced`, `missing_from_docs`, or `unreachabl
 3. **Discovery** — ego-browser entry URL; walk sidebar, index, version switcher, cross-links; classify URLs (Page Scope); optional `firecrawl-map`
 4. **Fetch** — per Capture by Page Type → `source/raw/` or `source/snapshots/` (ego-browser); Firecrawl fallback → `.firecrawl/` (still Tier B). Expand hidden content; chase cross-refs into frontier
 5. **Coverage** — each checklist item: `sourced` (`path:line`), `missing_from_docs`, or `unreachable`; flag pending cross-ref URLs as `unresolved_ref`
-6. **Loop** — checklist gaps, pending cross-ref `unresolved_ref`, or frontier URLs → step 3 if `round < 5`; at `round >= 5`, reclassify per Loop Contract then proceed to step 7; two fetch failures → `unreachable`; blocking gaps → **NO-GO** unless user approves partial scope
+6. **Loop** — checklist gaps, pending cross-ref `unresolved_ref`, or frontier URLs → step 3 if `round < 5`; at `round >= 5`, reclassify per Loop Contract then proceed to step 7; two fetch failures → `unreachable`; any `round_limit_deferred` → **NO-GO** unless user explicitly approves reduced scope
 7. **Report** — write `docs/api-source-report.md` per `references/report-template.md`
 
 **Complete, trusted spec (step 2 short-circuit criteria):** all must pass before skipping discovery — (1) parses as valid OpenAPI 3.x or OpenRPC 1.x; (2) covers the in-scope endpoints/operations or RPC methods (cross-check `llms.txt` or docs index when available); (3) not obviously partial (empty `paths`/`methods`, single operation when docs list many, version mismatch); (4) user has not flagged it stale/unverified. Any doubt → treat as incomplete and continue discovery. Short-circuit still requires step 7 report — never finish without `docs/api-source-report.md`.
@@ -125,5 +137,5 @@ Do not substitute memory, training data, or third-party specs for missing source
 
 Write **`docs/api-source-report.md`** (Tier C) using `references/report-template.md`.
 
-**GO** = every in-scope item `sourced` from Tier A/B or explicitly `missing_from_docs`/`unreachable` with user approval where needed; no pending cross-ref `unresolved_ref`. **Evidence conflicts** (Tier A vs B disagree): cite the **winning tier** (rank 1 > 2 > 3) in Coverage Report `path:line`, and record the conflict in Unresolved Items with both ranks — conflicts do not block **GO**.  
-**NO-GO** = blocking `missing_from_docs` for required schema elements.
+**GO** = every in-scope item `sourced` from Tier A/B or explicitly `missing_from_docs`/`unreachable` with user approval where needed; no pending cross-ref `unresolved_ref`; no `round_limit_deferred`. **Evidence conflicts** (Tier A vs B disagree): cite the **winning tier** (rank 1 > 2 > 3) in Coverage Report `path:line`, and record the conflict in Unresolved Items with both ranks — conflicts do not block **GO**.  
+**NO-GO** = blocking `missing_from_docs` for required schema elements; or any `round_limit_deferred` without user-approved reduced scope.

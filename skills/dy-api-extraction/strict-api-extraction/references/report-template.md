@@ -28,6 +28,7 @@
 | --- | --- | --- | --- |
 | [evidence conflict between Tier A and B] | evidence_conflict | 1 / 2 / 3 | [winning tier and detail] |
 | [cross-ref URL not yet fetched] | unresolved_ref | — | [URL to fetch; cleared before GO] |
+| [URL not fetched — round limit reached] | round_limit_deferred | — | [URL; requires user-approved reduced scope for GO] |
 | [exhaustive search found nothing] | missing_from_docs | — | [detail] |
 
 ## Discovery Log
