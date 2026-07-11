@@ -1,0 +1,4 @@
+interface:
+  display_name: "Strict API Extraction"
+  short_description: "Exhaustively collect official API doc pages into an evidence corpus without guessing."
+  default_prompt: "Use strict-api-extraction to collect all official API documentation pages needed before schema work, continuing discovery until coverage is satisfied and never guessing undocumented elements."
