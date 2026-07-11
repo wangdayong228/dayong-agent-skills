@@ -3,6 +3,7 @@
 ## Summary
 - Target: OpenAPI 3.x | OpenRPC 1.x
 - Entry URL: [url]
+- Scope: [in-scope endpoints/APIs for this run]
 - Tier A raw: `source/raw/` ([n] files)
 - Tier B snapshots: `source/snapshots/` ([n] files)
 - Tier B auxiliary: `.firecrawl/` ([n] files, or none)
@@ -23,7 +24,14 @@
 | User.email type | missing_from_docs | — | exhaustive search completed |
 
 ## Unresolved Items
-[List missing_from_docs and unreachable items with searched URLs/paths]
+| Item | Status | Conflict rank | Notes |
+| --- | --- | --- | --- |
+| [evidence conflict between Tier A and B] | evidence_conflict | 1 / 2 / 3 | [winning tier and detail] |
+| [cross-ref URL not yet fetched] | unresolved_ref | — | [URL to fetch; cleared before GO] |
+| [exhaustive search found nothing] | missing_from_docs | — | [detail] |
+
+## Discovery Log
+[Brief round-by-round notes]
 
 ## Next Step
 Sources ready for schema assembly only when Gate is **GO**. Do not assemble until user requests it.
