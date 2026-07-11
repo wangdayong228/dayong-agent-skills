@@ -26,12 +26,13 @@ Deliver **source artifacts** (Tier A/B) plus one **derived** report (Tier C). Sc
 | Tier | Location | What | Cite as evidence? | Conflict rank |
 | --- | --- | --- | --- | --- |
 | A raw | `source/raw/` | HTTP bytes from docs domain (openapi.json, llms.txt) | Yes | 1 |
-| B snapshots | `source/snapshots/` | Page captures (snapshotText, Firecrawl) | Yes | 2 (ego-browser) / 3 (Firecrawl) |
+| B snapshots | `source/snapshots/` | ego-browser page captures (snapshotText) | Yes | 2 |
+| B snapshots | `.firecrawl/` | Firecrawl fallback captures (keep default filenames) | Yes | 3 |
 | C derived | `docs/api-source-report.md` | Agent-written index | No | — |
 
-Also: `.firecrawl/` for Firecrawl auxiliary output — do not rename. No `schema-evidence` or `corpus` folders. Add `.local/` and `.firecrawl/` to `.gitignore`.
+No `schema-evidence` or `corpus` folders. Add `.local/` and `.firecrawl/` to `.gitignore`.
 
-Schema fields must trace to Tier A or B with `path:line`. The report is never sole evidence.
+Schema fields must trace to Tier A or B with `path:line` (`source/raw/`, `source/snapshots/`, or `.firecrawl/`). The report is never sole evidence.
 
 **Snapshot frontmatter** (Tier A raw records `page_type` in report Source Index only):
 
@@ -54,9 +55,9 @@ Classify each URL, pick first-try tool, record `page_type`. Two failed attempts 
 | `page_type` | First try | Tier | Fallback |
 | --- | --- | --- | --- |
 | `machine-spec` | `serverFetch` (`.json`, `.yaml`, `.md`, `llms.txt`) | A → `source/raw/` | `browserFetch` |
-| `static-html` | `serverFetch` or `snapshotText` | B | firecrawl-scrape |
-| `spa` | `openOrReuseTab` + wait + `snapshotText` | B | firecrawl-scrape |
-| `interactive` | expand tabs/accordions/pagination, then `snapshotText` | B | firecrawl-scrape |
+| `static-html` | `serverFetch` or `snapshotText` | B → `source/snapshots/` | firecrawl-scrape → `.firecrawl/` |
+| `spa` | `openOrReuseTab` + wait + `snapshotText` | B → `source/snapshots/` | firecrawl-scrape → `.firecrawl/` |
+| `interactive` | expand tabs/accordions/pagination, then `snapshotText` | B → `source/snapshots/` | firecrawl-scrape → `.firecrawl/` |
 | `auth-gated` | ego-browser with user session | B | `unreachable` (login required) |
 
 Firecrawl is auxiliary only — bulk URL map (`firecrawl-map`) and Tier B fallback, never the sole fetch path.
@@ -70,12 +71,14 @@ Stop when every checklist item is `sourced`, `missing_from_docs`, or `unreachabl
 ## Workflow
 
 1. **Dialect** — REST → OpenAPI 3.x; JSON-RPC → OpenRPC 1.x
-2. **Probe Tier A** — `serverFetch` `/openapi.json`, `/swagger.json`, `/llms.txt` → `source/raw/`; complete spec found → pin and exit
+2. **Probe Tier A** — `serverFetch` `/openapi.json`, `/swagger.json`, `/llms.txt` → `source/raw/`. **Pin and exit only** when a **complete, trusted** machine-readable spec is confirmed (see below). Otherwise continue discovery.
 3. **Discovery** — ego-browser entry URL; walk sidebar, index, version switcher, cross-links; classify URLs (Page Scope); optional `firecrawl-map`
-4. **Fetch** — per Capture by Page Type → `source/raw/` or `source/snapshots/`; expand hidden content; chase cross-refs into frontier
+4. **Fetch** — per Capture by Page Type → `source/raw/` or `source/snapshots/` (ego-browser); Firecrawl fallback → `.firecrawl/` (still Tier B). Expand hidden content; chase cross-refs into frontier
 5. **Coverage** — each checklist item: `sourced` (`path:line`), `missing_from_docs`, or `unreachable`; flag `unresolved_ref`
 6. **Loop** — gaps → step 3 if `round < 5`; two fetch failures → `unreachable`; blocking gaps → **NO-GO** unless user approves partial scope
 7. **Report** — write `docs/api-source-report.md` per `references/report-template.md`
+
+**Complete, trusted spec (step 2 exit criteria):** all must pass before pin-and-exit — (1) parses as valid OpenAPI 3.x or OpenRPC 1.x; (2) covers the in-scope endpoints/operations (cross-check `llms.txt` or docs index when available); (3) not obviously partial (empty `paths`, single operation when docs list many, version mismatch); (4) user has not flagged it stale/unverified. Any doubt → treat as incomplete and continue discovery.
 
 ## Page Scope
 
@@ -106,7 +109,7 @@ Forbidden without Tier A/B text: infer types from examples; invent enums; assume
 | Excuse → Reality |
 | --- |
 | "Firecrawl is faster" → ego-browser primary; Firecrawl fallback only |
-| "Report says sourced" → Tier C is not evidence; need raw/snapshots `path:line` |
+| "Report says sourced" → Tier C is not evidence; need Tier A/B `path:line` (`source/raw/`, `source/snapshots/`, or `.firecrawl/`) |
 | "Example shows string" → examples ≠ schema |
 | "Live API confirms field" → guessing unless user approved |
 
