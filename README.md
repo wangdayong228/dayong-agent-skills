@@ -14,7 +14,7 @@
 | `affected-path-review` | 任何 code review、PR review、review 子代理或 review comments 处理；将审查范围从 diff 扩展到完整行为路径 |
 | `pr-comment-review` | 拉取、评估、处理或汇总 GitHub PR 评论与可执行的 review thread |
 | `iterative-code-review` | 要求子代理/AI reviewer 审查本地改动，并由主代理循环修复直至通过 |
-| `strict-api-extraction` | 从官方 API 文档站完整采集原始页面，为后续 OpenAPI/OpenRPC schema 组装提供证据齐全的 corpus；coverage 不足时继续抓取，禁止猜测未文档化的 schema 元素 |
+| `strict-api-extraction` | 从官方 API 文档站完整采集原始素材（`source/raw` + `source/snapshots`）并产出 `api-source-report.md`；coverage 不足时继续抓取，禁止猜测未文档化的 schema 元素 |
 
 例外：若你明确要求 `diff-only review`，则只审查 diff，不会按 `affected-path-review` 扩展到完整行为路径。
 

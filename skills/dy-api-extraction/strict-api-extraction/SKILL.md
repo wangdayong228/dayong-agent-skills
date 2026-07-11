@@ -11,203 +11,112 @@ Collect every official documentation page needed to produce a complete API schem
 
 **Violating the letter of these rules is violating the spirit of these rules.**
 
-## When to Use
+## When to Use / NOT
 
-- Building or regenerating OpenAPI 3.x / OpenRPC 1.x from official docs
-- Verifying that scraped docs are sufficient before schema assembly
-- Official docs are fragmented across reference pages, schema pages, auth guides, and error catalogs
+**Use:** building OpenAPI 3.x / OpenRPC 1.x from official docs; fragmented or JS-heavy doc portals (ReadMe, Stoplight, etc.).
 
-## When NOT to Use
-
-- A complete, trusted machine-readable spec already exists — pin and use it directly
-- The task is only client codegen from an existing spec — use api-client-generator
-- The task is general docs ingestion without schema completeness requirements — use firecrawl-knowledge-ingest
+**NOT:** complete trusted spec already exists (pin it); client codegen only → `api-client-generator`; general docs ingest without schema completeness → `firecrawl-knowledge-ingest`.
 
 ## Scope Boundary
 
-This skill delivers an evidence-complete page corpus (in Firecrawl's default output) plus one human-readable evidence report. Schema assembly (writing openapi.yaml or openrpc.json) is a separate downstream step. State this boundary at task start when the user asks to "reconstruct" or "generate" a spec.
+Deliver **source artifacts** (Tier A/B) plus one **derived** report (Tier C). Schema assembly is downstream — state this when the user asks to "reconstruct" or "generate" a spec.
 
-## Storage Convention
+## Tiers, Storage, Evidence
 
-**Use Firecrawl defaults. Do not invent a parallel directory tree.**
+| Tier | Location | What | Cite as evidence? | Conflict rank |
+| --- | --- | --- | --- | --- |
+| A raw | `source/raw/` | HTTP bytes from docs domain (openapi.json, llms.txt) | Yes | 1 |
+| B snapshots | `source/snapshots/` | Page captures (snapshotText, Firecrawl) | Yes | 2 (ego-browser) / 3 (Firecrawl) |
+| C derived | `docs/api-source-report.md` | Agent-written index | No | — |
 
-- Scraped pages land in `.firecrawl/` with Firecrawl's normal filenames (e.g. `.firecrawl/{site}-{path}.md`).
-- Do **not** create `.firecrawl/schema-evidence/` or other subfolders unless the user explicitly asks.
-- Do **not** rename or move Firecrawl outputs unless the user explicitly asks.
-- Ensure `.firecrawl/` is in `.gitignore`. Never commit scraped third-party documentation.
-- Human-readable deliverable: **`docs/api-evidence-report.md`** only (see Deliverable).
+Also: `.firecrawl/` for Firecrawl auxiliary output — do not rename. No `schema-evidence` or `corpus` folders. Add `.local/` and `.firecrawl/` to `.gitignore`.
 
-When citing evidence, use the **actual path under `.firecrawl/`** plus line number: `.firecrawl/docs.example.com-reference-users.md:42`.
+Schema fields must trace to Tier A or B with `path:line`. The report is never sole evidence.
 
-## Source Ranking
+**Snapshot frontmatter** (Tier A raw records `page_type` in report Source Index only):
 
-When sources conflict, prefer higher-ranked evidence:
+```yaml
+---
+source_url: https://docs.example.com/reference/users
+page_type: spa
+capture_method: ego-browser-snapshotText
+fetched_at: 2026-07-11T12:00:00Z
+tier: B
+---
+```
 
-1. Official machine-readable spec (openapi.json, openrpc.json) from the docs site
-2. Main-content documentation tables, parameter lists, response examples (`.firecrawl/*.md`)
-3. Cross-page corroboration from auth, error, and support/reference pages
+## Capture by Page Type
+
+**REQUIRED:** Load `ego-browser` before discovery or fetch. Do not substitute WebFetch or Cursor browser MCP. Load `firecrawl-scrape` / `firecrawl-map` only as needed.
+
+Classify each URL, pick first-try tool, record `page_type`. Two failed attempts → fallback or `unreachable`.
+
+| `page_type` | First try | Tier | Fallback |
+| --- | --- | --- | --- |
+| `machine-spec` | `serverFetch` (`.json`, `.yaml`, `.md`, `llms.txt`) | A → `source/raw/` | `browserFetch` |
+| `static-html` | `serverFetch` or `snapshotText` | B | firecrawl-scrape |
+| `spa` | `openOrReuseTab` + wait + `snapshotText` | B | firecrawl-scrape |
+| `interactive` | expand tabs/accordions/pagination, then `snapshotText` | B | firecrawl-scrape |
+| `auth-gated` | ego-browser with user session | B | `unreachable` (login required) |
+
+Firecrawl is auxiliary only — bulk URL map (`firecrawl-map`) and Tier B fallback, never the sole fetch path.
 
 ## Loop Contract
 
-Run at most five discovery rounds. Track explicitly:
+At most **5 discovery rounds**. Track: `round`, `frontier`, `sources`, `sourced`, `unresolved_ref`, `unreachable`, `missing_from_docs`.
 
-| Field | Meaning |
-| --- | --- |
-| `round` | 1 through 5 |
-| `frontier` | URLs classified as include/defer, not yet fetched |
-| `corpus` | Files under `.firecrawl/` plus URL, title, role metadata recorded in the report |
-| `sourced` | Checklist item confirmed with `.firecrawl/...:line` citation |
-| `unresolved_ref` | Cross-references without a corpus page yet |
-| `unreachable` | URL attempted but blocked (403, 404, login wall, repeated fetch failure) |
-| `missing_from_docs` | Exhaustive search completed; official docs silent |
-
-Stop early when every checklist item is `sourced`, `missing_from_docs`, or `unreachable`, and the report records **GO** or **NO-GO**. Stop after round 5 even if gaps remain.
-
-Increment `round` each time step 3 (Discovery) is re-entered. The first pass through step 3 is round 1.
-
-At round 5, reclassify any remaining `unresolved_ref` as `unreachable` (fetch blocked) or `missing_from_docs` (round limit reached).
+Stop when every checklist item is `sourced`, `missing_from_docs`, or `unreachable` and Gate is **GO** or **NO-GO**. Increment `round` each re-entry to Discovery. At round 5, reclassify remaining `unresolved_ref`.
 
 ## Workflow
 
-1. **Identify target schema dialect.**
-   - REST → OpenAPI 3.x
-   - JSON-RPC → OpenRPC 1.x
-
-2. **Probe machine-readable spec (quick).**
-   - Try `/openapi.json`, `/swagger.json`, `/llms.txt` on the docs domain
-   - Record outcome in the report Summary (found / incomplete / not found)
-   - Complete trusted spec found → stop this skill; pin spec and exit
-   - Otherwise continue
-
-3. **Discovery — build the URL frontier.**
-   - Start from the official API docs entry URL
-   - Use firecrawl-map; outputs stay in `.firecrawl/` per Firecrawl defaults
-   - Enumerate sidebar, reference index, version branches, pagination, search, cross-links
-   - Classify each URL: `include`, `exclude`, or `defer` (see Page Scope)
-
-4. **Fetch — collect raw pages.**
-   - Use firecrawl-scrape with `--only-main-content` for readable markdown into `.firecrawl/`
-   - Preserve code blocks, tables, and parameter lists verbatim
-   - Follow unresolved cross-references by adding linked URLs to the frontier
-   - **Optional escalation:** if a ReadMe/JS-heavy page lacks schema in `.md`, scrape `-f rawHtml` to `.firecrawl/` and search for embedded schema signals — do not make this the default for every page
-
-5. **Coverage check — compare corpus against the checklist.**
-   - Every item: `sourced` with `.firecrawl/...:line`, or `missing_from_docs`, or `unreachable`
-   - Flag `unresolved_ref` when a referenced section is not yet in the corpus
-
-6. **Close gaps — loop until done or round limit reached.**
-   - Gaps or `unresolved_ref` → return to step 3 if `round < 5`
-   - Two failed fetch attempts for the same URL → mark `unreachable`
-   - **NO-GO** if blocking gaps remain and user has not approved partial scope
-
-7. **Deliver `docs/api-evidence-report.md`.**
+1. **Dialect** — REST → OpenAPI 3.x; JSON-RPC → OpenRPC 1.x
+2. **Probe Tier A** — `serverFetch` `/openapi.json`, `/swagger.json`, `/llms.txt` → `source/raw/`; complete spec found → pin and exit
+3. **Discovery** — ego-browser entry URL; walk sidebar, index, version switcher, cross-links; classify URLs (Page Scope); optional `firecrawl-map`
+4. **Fetch** — per Capture by Page Type → `source/raw/` or `source/snapshots/`; expand hidden content; chase cross-refs into frontier
+5. **Coverage** — each checklist item: `sourced` (`path:line`), `missing_from_docs`, or `unreachable`; flag `unresolved_ref`
+6. **Loop** — gaps → step 3 if `round < 5`; two fetch failures → `unreachable`; blocking gaps → **NO-GO** unless user approves partial scope
+7. **Report** — write `docs/api-source-report.md` per `references/report-template.md`
 
 ## Page Scope
 
-**Include:**
-- API reference, endpoints, methods, operations
-- Request/response schema pages, object/type definitions
-- Authentication, authorization, scopes, API keys
-- Error codes, error response formats
-- Webhooks, callbacks, subscriptions (if documented)
-- Rate limits when they define request/response contract details
-- Support/reference pages: enum lists, instruments, symbols, exchanges, or other lookup tables referenced by endpoints
+**Include:** endpoints, schemas/types, auth, errors, webhooks, rate limits affecting contract, enum/symbol reference pages.
 
-**Exclude (unless they define schema elements):**
-- Tutorials, quick starts, getting-started guides
-- SDK usage examples without schema definitions
-- Changelogs, blog posts, release notes
-- Pricing, support, or marketing pages
+**Exclude:** tutorials, SDK-only examples, changelogs, marketing — unless they define schema elements.
 
 ## Coverage Checklist
 
-Every item must be `sourced`, `missing_from_docs`, or `unreachable`:
+Every item: `sourced`, `missing_from_docs`, or `unreachable`.
 
 | Element | Required evidence |
 | --- | --- |
-| Endpoint / RPC method | Name, HTTP method or RPC name, `.firecrawl/...:line` |
+| Endpoint / RPC | Name, method, Tier A/B `path:line` |
 | Parameters | Name, location, type, required/optional |
 | Request body | Content-type, schema or field list |
-| Responses | Each documented status; body schema or explicit "no body" |
-| Schemas / objects | Field names, types, required fields, enum values |
-| Authentication | Scheme type, header/param name, scopes if applicable |
-| Errors | Documented error codes or error object shape |
-| Webhooks / callbacks | Event types, payload schema (if documented) |
-| Cross-references | Referenced pages present in `.firecrawl/` |
+| Responses | Each status; body schema or "no body" |
+| Schemas / objects | Fields, types, required, enums |
+| Authentication | Scheme, header/param, scopes |
+| Errors | Codes or error object shape |
+| Webhooks | Event types, payload schema |
+| Cross-references | Referenced pages in snapshots or raw |
 
-## No-Guess Rules
+## No-Guess & Red Flags
 
-Forbidden without explicit documentation text:
+Forbidden without Tier A/B text: infer types from examples; invent enums; assume required/optional; add status codes; copy similar endpoints; use SDK or third-party specs; probe **live API product** (docs-domain raw endpoints OK).
 
-- Inferring types from example values alone
-- Inventing enum members not listed in docs
-- Assuming required/optional when docs are silent
-- Adding status codes not documented
-- Copying patterns from similar endpoints
-- Using SDK source code or third-party specs as substitutes
-- Probing live API responses to infer fields (unless user explicitly approves live probing)
+| Excuse → Reality |
+| --- |
+| "Firecrawl is faster" → ego-browser primary; Firecrawl fallback only |
+| "Report says sourced" → Tier C is not evidence; need raw/snapshots `path:line` |
+| "Example shows string" → examples ≠ schema |
+| "Live API confirms field" → guessing unless user approved |
+
+**STOP:** citing report alone; Firecrawl-only when ego-browser available; writing openapi.yaml before **GO**; stopping with unexplored sidebar/cross-refs; open `unresolved_ref` marked complete.
+
+Do not substitute memory, training data, or third-party specs for missing sources.
 
 ## Deliverable
 
-Write **`docs/api-evidence-report.md`**:
+Write **`docs/api-source-report.md`** (Tier C) using `references/report-template.md`.
 
-```markdown
-# Strict API Extraction: [API Name]
-
-## Summary
-- Target: OpenAPI 3.x | OpenRPC 1.x
-- Entry URL: [url]
-- Machine-readable spec: [found at URL | probed, not found | incomplete]
-- Firecrawl corpus: `.firecrawl/` ([n] files)
-- Coverage: [sourced n / total n]
-- Gate: **GO** | **NO-GO**
-
-## Corpus Index
-| File (under .firecrawl/) | URL | Role |
-| --- | --- | --- |
-| docs.example.com-reference-users.md | https://... | endpoint-ref |
-
-## Coverage Report
-| Element | Status | Source | Notes |
-| --- | --- | --- | --- |
-| GET /users | sourced | .firecrawl/docs.example.com-reference-users.md:117 | |
-| User.email type | missing_from_docs | — | exhaustive search completed |
-
-## Unresolved Items
-[List missing_from_docs and unreachable items with searched URLs/paths]
-
-## Next Step
-Corpus ready for schema assembly only when Gate is **GO**. Do not assemble until user requests it.
-```
-
-**GO** = every in-scope checklist item is `sourced` or explicitly out of scope with user approval.  
-**NO-GO** = blocking `missing_from_docs` items remain for required schema elements.
-
-## Rationalization Table
-
-| Excuse | Reality |
-| --- | --- |
-| "The example shows it's a string" | Examples are not schema. Mark missing or find the type page. |
-| "Other endpoints use the same pattern" | Pattern matching is guessing. |
-| "We have enough to start the spec" | Continue fetching until coverage passes or NO-GO is explicit. |
-| "I'll reorganize Firecrawl files into schema-evidence" | Unnecessary complexity. Use `.firecrawl/` as-is. |
-| "A live API call confirms the field" | Live probing is guessing unless user approved it. |
-
-## Red Flags — STOP
-
-- Writing openapi.yaml before the report shows **GO**
-- Filling schema fields without a `.firecrawl/...:line` citation
-- Stopping while sidebar or cross-refs remain unexplored
-- Marking coverage complete with open `unresolved_ref`
-
-## Tooling
-
-| Capability | Preferred tools |
-| --- | --- |
-| URL discovery | firecrawl-map, firecrawl-search |
-| Page fetch | firecrawl-scrape (`--only-main-content`) |
-| Spec probe | firecrawl-scrape (`/openapi.json`, `/llms.txt`) |
-| JS-heavy / auth-gated | firecrawl-interact, browser navigation |
-| Corpus search | `rg` over `.firecrawl/` |
-
-Do not substitute memory, training data, or third-party specs for missing pages.
+**GO** = every in-scope item `sourced` from Tier A/B or explicitly out of scope with user approval.  
+**NO-GO** = blocking `missing_from_docs` for required schema elements.
