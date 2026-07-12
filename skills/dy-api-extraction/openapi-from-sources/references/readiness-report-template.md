@@ -50,4 +50,4 @@ Reply with one option number:
 - Schema **NO-GO** → wait for user option number
 - Schema **GO (example-fallback)** → review `x-inferred-from: example` fields before client generation
 - Schema **GO (reduced-scope)** → review `out_of_scope` exclusions before client generation
-- Schema **GO** → run `api-client-generator` on `schema/openapi.yaml`
+- Schema **GO** → run `api-client-generator` (generic) or `typed-sdk-from-openapi` (Go) on `schema/openapi.yaml`
