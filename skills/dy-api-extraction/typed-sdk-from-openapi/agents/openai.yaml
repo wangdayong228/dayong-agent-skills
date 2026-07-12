@@ -1,4 +1,4 @@
 interface:
   display_name: "Typed SDK From OpenAPI"
   short_description: "Generate a clean two-layer Go SDK from a trusted pinned OpenAPI 3.x spec."
-  default_prompt: "Use typed-sdk-from-openapi. First invoke api-client-generator for raw codegen and transport seam baseline, then produce a clean Go output module with generated raw layer, refined pkg/client facade, internal transport, and confirmed retry policy."
+  default_prompt: "Use typed-sdk-from-openapi. Run preflight trust/pinning checks and dependency check first, then load/apply api-client-generator guidance only, complete retry-policy draft/review/confirmation gate, and only then run Phase A/B codegen to produce a clean Go output module with generated raw layer, refined pkg/client facade, internal transport, and spec manifest."

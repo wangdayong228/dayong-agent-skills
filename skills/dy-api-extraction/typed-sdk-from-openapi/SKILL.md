@@ -1,13 +1,13 @@
 ---
 name: typed-sdk-from-openapi
-description: Use when a trusted pinned OpenAPI 3.x spec exists and a clean two-layer Go SDK is needed. Always invoke api-client-generator first for raw codegen/transport seam, then build refined pkg/client with retry-policy confirmation gate. Do NOT crawl docs or assemble OpenAPI here.
+description: Use when a trusted pinned OpenAPI 3.x spec exists and a clean two-layer Go SDK is needed. Run preflight and dependency checks first, load api-client-generator guidance, then complete retry-policy draft/review/confirmation gate before Phase A/B codegen. Do NOT crawl docs or assemble OpenAPI here.
 ---
 
 # Typed SDK From OpenAPI (Go)
 
 ## Core Rule
 
-Input is a trusted pinned OpenAPI 3.x spec from any source. First run the `api-client-generator` workflow to produce raw generated SDK plus transport seam baseline, then deliver a clean two-layer Go SDK module: `generated/` (raw) + `pkg/client/` (refined API), with retry policy confirmed by the user.
+Input is a trusted pinned OpenAPI 3.x spec from any source. Run preflight gate and dependency check first, then load/apply `api-client-generator` guidance (without running codegen yet), complete retry policy draft/review/confirmation gate, and only then produce the clean two-layer Go SDK module: `generated/` (raw) + `pkg/client/` (refined API).
 
 `internal/transport/` is part of the refined layer implementation and must stay internal.
 
@@ -33,6 +33,10 @@ Input is a trusted pinned OpenAPI 3.x spec from any source. First run the `api-c
 This skill does not generate or repair OpenAPI specs. It consumes an existing trusted spec and builds SDK outputs only.
 
 `openapi-from-sources` is an optional upstream, not a prerequisite.
+
+## Dependency Prerequisite
+
+This skill requires `api-client-generator` capability in the environment. If unavailable, stop with NO-GO and record the missing dependency in `.sdkgen/sdk-readiness-report.md`.
 
 ## Input Requirements
 
@@ -61,6 +65,7 @@ Requirements:
   generated/client.gen.go
   internal/transport/{transport.go,errors.go,operation.go,retry.go}
   pkg/client/client.go
+  sdk/spec-manifest.yaml
   sdk/retry-policy.yaml
   scripts/regen.sh
   go.mod
@@ -89,23 +94,26 @@ If SDK Gate is NO-GO, only write `.sdkgen/sdk-readiness-report.md` (and draft re
 - Retry policy is confirmed by user for all in-scope operations
 - No `policy: unreviewed`
 - Final output module structure is complete
+- `<output>/sdk/spec-manifest.yaml` records spec SHA256 provenance
 - `go test ./...` passes in `<output>/`
 
 Otherwise **NO-GO**.
 
 ## Workflow
 
-1. **Invoke api-client-generator first** (mandatory)
-2. **Preflight**: validate spec trust/pinning/OpenAPI 3.x; record SHA256 to `.sdkgen/`
-3. **Draft retry policy**: write `.sdkgen/retry-policy.draft.yaml` per `references/retry-policy-schema.md`
-4. **User review**: batch table + `approve all` or explicit overrides
-5. **Gate check**: GO or NO-GO
-6. **Phase A (raw)**: generate `generated/client.gen.go` via `oapi-codegen`
-7. **Phase B (refined)**: implement `internal/transport/` and `pkg/client/`
-8. **Copy/normalize spec** into `<output>/schema/openapi.yaml`
-9. **Write regen script** `<output>/scripts/regen.sh`
-10. **Validate**: structure checks + `go test ./...`
-11. **Deliver**: clean `<output>/`; keep `.sdkgen/` outside deliverable
+1. **Preflight gate first**: validate spec trust/pinning/OpenAPI 3.x and record SHA256 to `.sdkgen/`; if fail, NO-GO and stop before codegen
+2. **Check dependency**: confirm `api-client-generator` capability is available; if missing, NO-GO and stop
+3. **Invoke api-client-generator guidance** and apply its constraints in subsequent generation/transport steps (mandatory dependency; do not run codegen before policy gate)
+4. **Draft retry policy**: write `.sdkgen/retry-policy.draft.yaml` per `references/retry-policy-schema.md`
+5. **User review**: batch table + `approve all` or explicit overrides
+6. **Policy gate**: if any operation is unconfirmed or `unreviewed`, NO-GO and stop before deliverable
+7. **Phase A (raw)**: generate `generated/client.gen.go` via `oapi-codegen`
+8. **Phase B (refined)**: implement `internal/transport/` and `pkg/client/`
+9. **Copy/normalize spec** into `<output>/schema/openapi.yaml`
+10. **Write spec manifest** at `<output>/sdk/spec-manifest.yaml` with spec path + SHA256 + generation timestamp
+11. **Write regen script** `<output>/scripts/regen.sh`
+12. **Final SDK gate**: validate structure checks + `go test ./...`; then decide GO/NO-GO
+13. **Deliver**: clean `<output>/`; keep `.sdkgen/` outside deliverable
 
 ## Transport Rules
 
@@ -133,6 +141,7 @@ Before claiming completion:
 - `<output>/schema/openapi.yaml` exists
 - `<output>/generated/client.gen.go` exists and is generated-only
 - `<output>/internal/transport/` and `<output>/pkg/client/` exist and compile
+- `<output>/sdk/spec-manifest.yaml` exists and includes OpenAPI SHA256 provenance
 - `<output>/sdk/retry-policy.yaml` has confirmed operations and no `unreviewed`
 - `<output>/scripts/regen.sh` reproduces generated layer
 - `<output>/go test ./...` passes

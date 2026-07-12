@@ -23,6 +23,7 @@
 
 - draft_policy_path: `.sdkgen/retry-policy.draft.yaml`
 - confirmed_policy_path: `<output>/sdk/retry-policy.yaml`
+- spec_manifest_path: `<output>/sdk/spec-manifest.yaml`
 - review_mode: `approve all` or overrides
 - overrides:
 
@@ -44,6 +45,7 @@
 - [ ] `<output>/generated/client.gen.go`
 - [ ] `<output>/internal/transport/`
 - [ ] `<output>/pkg/client/`
+- [ ] `<output>/sdk/spec-manifest.yaml`
 - [ ] `<output>/sdk/retry-policy.yaml`
 - [ ] `<output>/scripts/regen.sh`
 - [ ] `<output>/go.mod`

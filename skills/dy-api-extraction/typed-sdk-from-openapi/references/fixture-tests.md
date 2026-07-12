@@ -6,6 +6,7 @@ This skill intentionally does not ship `test/` or `scripts/` helpers. Verificati
 
 - Confirm input spec is OpenAPI 3.x and pinned
 - Record SHA256 in `.sdkgen/sdk-readiness-report.md`
+- Confirm `api-client-generator` capability exists before code generation
 - Create `.sdkgen/retry-policy.draft.yaml`
 
 ## Gate Verification
@@ -20,6 +21,7 @@ This skill intentionally does not ship `test/` or `scripts/` helpers. Verificati
 - `<output>/generated/client.gen.go` exists
 - `<output>/internal/transport/` exists
 - `<output>/pkg/client/` exists
+- `<output>/sdk/spec-manifest.yaml` exists and records input SHA256
 - `<output>/sdk/retry-policy.yaml` exists and is confirmed
 - `<output>/scripts/regen.sh` exists
 - `<output>/go.mod` exists
