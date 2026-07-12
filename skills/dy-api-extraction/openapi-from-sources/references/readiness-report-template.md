@@ -7,7 +7,7 @@
 - Scope: [in-scope endpoints/operations]
 - Strictness: strict | example-fallback
 - Extraction gate (if report present): **GO** | **NO-GO** | n/a
-- Schema gate: **GO** | **NO-GO** | **GO (example-fallback)**
+- Schema gate: **GO** | **NO-GO** | **GO (example-fallback)** | **GO (reduced-scope)**
 - Output: `schema/openapi.yaml` | (none — gaps only)
 
 ## Material Inventory
@@ -49,4 +49,5 @@ Reply with one option number:
 ## Next Step
 - Schema **NO-GO** → wait for user option number
 - Schema **GO (example-fallback)** → review `x-inferred-from: example` fields before client generation
+- Schema **GO (reduced-scope)** → review `out_of_scope` exclusions before client generation
 - Schema **GO** → run `api-client-generator` on `schema/openapi.yaml`
