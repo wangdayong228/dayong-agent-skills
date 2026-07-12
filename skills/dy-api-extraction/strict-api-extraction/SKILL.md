@@ -137,5 +137,7 @@ Do not substitute memory, training data, or third-party specs for missing source
 
 Write **`docs/api-source-report.md`** (Tier C) using `references/report-template.md`.
 
-**GO** = every in-scope item `sourced` from Tier A/B, `N/A`, or `out_of_scope` (user-approved reduced scope), or `missing_from_docs` after exhaustive search; no pending cross-ref `unresolved_ref`; no `round_limit_deferred` unless user approved reduced scope (Scope updated, deferred items `out_of_scope`). **Evidence conflicts** (Tier A vs B disagree): cite the **winning tier** (rank 1 > 2 > 3) in Coverage Report `path:line`, and record the conflict in Unresolved Items with both ranks — conflicts do not block **GO**.  
-**NO-GO** = any required in-scope element is `unreachable` or `missing_from_docs` (without `out_of_scope` approval); or any `round_limit_deferred` without user-approved reduced scope.
+**GO** = every in-scope item has a terminal collection status — `sourced` from Tier A/B, `N/A`, user-approved `out_of_scope`, or `missing_from_docs` after exhaustive search; no pending cross-ref `unresolved_ref`; no `round_limit_deferred` unless user approved reduced scope (Scope updated, deferred items `out_of_scope`). **Evidence conflicts** (Tier A vs B disagree): cite the **winning tier** (rank 1 > 2 > 3) in Coverage Report `path:line`, and record the conflict in Unresolved Items with both ranks — conflicts do not block extraction **GO**.  
+**NO-GO** = any in-scope item lacks a terminal status; any required in-scope element is `unreachable`; or any `round_limit_deferred` without user-approved reduced scope.
+
+`missing_from_docs` completes extraction but does **not** imply schema readiness — downstream `openapi-from-sources` strict mode treats those items as blocking unless the user approves reduced scope or example-fallback.

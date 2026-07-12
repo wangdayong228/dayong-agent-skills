@@ -59,56 +59,84 @@ def extract_openapi_json(md_text: str) -> tuple[dict | None, int | None]:
         return None, start_line
 
 
-def response_schema_empty(spec: dict, status: str = "200") -> bool:
-    paths = spec.get("paths") or {}
-    for _path, item in paths.items():
+def parse_example_value(value: object) -> object | None:
+    if isinstance(value, str):
+        try:
+            return json.loads(strip_json_line_comments(value))
+        except json.JSONDecodeError:
+            return None
+    return value
+
+
+def media_type_example(body: dict) -> object | None:
+    if "example" in body:
+        return parse_example_value(body["example"])
+    for example in (body.get("examples") or {}).values():
+        parsed = parse_example_value(example.get("value"))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def schema_is_empty(schema: dict, body: dict | None = None) -> bool:
+    if schema.get("x-inferred-from"):
+        return False
+    if schema.get("$ref"):
+        return False
+    if not schema:
+        return True
+    if schema.get("additionalProperties") is not None:
+        return False
+    props = schema.get("properties")
+    if props:
+        return False
+    schema_type = schema.get("type")
+    if schema_type and schema_type != "object":
+        return False
+    return True
+
+
+def find_empty_response_schemas(spec: dict) -> list[tuple[str, str, str]]:
+    missing: list[tuple[str, str, str]] = []
+    for path, item in (spec.get("paths") or {}).items():
         for method in ("get", "post", "put", "patch", "delete"):
             op = item.get(method)
             if not op:
                 continue
-            resp = (op.get("responses") or {}).get(status) or {}
-            content = resp.get("content") or {}
-            for _mime, body in content.items():
-                schema = body.get("schema") or {}
-                props = schema.get("properties")
-                if props == {} or (schema.get("type") == "object" and not props):
-                    return True
-    return False
+            for status, resp in (op.get("responses") or {}).items():
+                content = resp.get("content") or {}
+                if not content:
+                    continue
+                for _mime, body in content.items():
+                    schema = body.get("schema") or {}
+                    if schema_is_empty(schema, body):
+                        missing.append((path, method, status))
+    seen: set[tuple[str, str, str]] = set()
+    deduped: list[tuple[str, str, str]] = []
+    for item in missing:
+        if item not in seen:
+            seen.add(item)
+            deduped.append(item)
+    return deduped
 
 
-def first_operation(spec: dict) -> tuple[str, str, dict] | None:
+def iter_operations(spec: dict):
     for path, item in (spec.get("paths") or {}).items():
         for method in ("get", "post", "put", "patch", "delete"):
             op = item.get(method)
             if op:
-                return path, method, op
-    return None
-
-
-def extract_response_example(spec: dict, status: str = "200") -> object | None:
-    op_info = first_operation(spec)
-    if not op_info:
-        return None
-    _, _, op = op_info
-    resp = (op.get("responses") or {}).get(status) or {}
-    content = resp.get("content") or {}
-    for body in content.values():
-        examples = body.get("examples") or {}
-        for example in examples.values():
-            value = example.get("value")
-            if isinstance(value, str):
-                try:
-                    return json.loads(strip_json_line_comments(value))
-                except json.JSONDecodeError:
-                    return None
-            if value is not None:
-                return value
-    return None
+                yield path, method, op
 
 
 def infer_schema_from_example(value: object, evidence_file: str, evidence_line: str) -> dict:
     evidence = [{"file": evidence_file, "line": evidence_line}]
     if isinstance(value, dict):
+        if not value:
+            return {
+                "type": "object",
+                "x-source-evidence": evidence,
+                "x-inferred-from": "example",
+            }
         return {
             "type": "object",
             "properties": {
@@ -119,10 +147,22 @@ def infer_schema_from_example(value: object, evidence_file: str, evidence_line: 
             "x-inferred-from": "example",
         }
     if isinstance(value, list):
-        item = value[0] if value else {}
+        if not value:
+            return {
+                "type": "array",
+                "x-source-evidence": evidence,
+                "x-inferred-from": "example",
+            }
         return {
             "type": "array",
-            "items": infer_schema_from_example(item, evidence_file, evidence_line),
+            "items": infer_schema_from_example(value[0], evidence_file, evidence_line),
+            "x-source-evidence": evidence,
+            "x-inferred-from": "example",
+        }
+    if value is None:
+        return {
+            "type": "string",
+            "nullable": True,
             "x-source-evidence": evidence,
             "x-inferred-from": "example",
         }
@@ -132,8 +172,6 @@ def infer_schema_from_example(value: object, evidence_file: str, evidence_line: 
         typ = "integer"
     elif isinstance(value, float):
         typ = "number"
-    elif value is None:
-        typ = "string"
     else:
         typ = "string"
     return {
@@ -143,35 +181,85 @@ def infer_schema_from_example(value: object, evidence_file: str, evidence_line: 
     }
 
 
+def annotate_node(node: object, evidence: list[dict]) -> None:
+    if isinstance(node, dict):
+        if "x-source-evidence" not in node and any(
+            k in node
+            for k in (
+                "type",
+                "properties",
+                "items",
+                "schema",
+                "content",
+                "responses",
+                "operationId",
+                "parameters",
+                "name",
+                "in",
+            )
+        ):
+            node["x-source-evidence"] = evidence
+        for key in ("schema", "items", "additionalProperties", "not"):
+            if key in node and isinstance(node[key], dict):
+                annotate_node(node[key], evidence)
+        for key in ("allOf", "oneOf", "anyOf"):
+            for sub in node.get(key) or []:
+                if isinstance(sub, dict):
+                    annotate_node(sub, evidence)
+        props = node.get("properties")
+        if isinstance(props, dict):
+            for prop_schema in props.values():
+                annotate_node(prop_schema, evidence)
+        for key in ("content", "responses", "requestBody", "components"):
+            child = node.get(key)
+            if isinstance(child, dict):
+                annotate_node(child, evidence)
+        paths = node.get("paths")
+        if isinstance(paths, dict):
+            for path_item in paths.values():
+                if isinstance(path_item, dict):
+                    annotate_node(path_item, evidence)
+        for method in ("get", "post", "put", "patch", "delete"):
+            op = node.get(method)
+            if isinstance(op, dict):
+                annotate_node(op, evidence)
+        if isinstance(node.get("parameters"), list):
+            for param in node["parameters"]:
+                annotate_node(param, evidence)
+    elif isinstance(node, list):
+        for item in node:
+            annotate_node(item, evidence)
+
+
 def annotate_spec(spec: dict, operation_evidence: tuple[str, str]) -> None:
     file, line = operation_evidence
     evidence = [{"file": file, "line": line}]
-    for _path, item in (spec.get("paths") or {}).items():
-        for method, op in item.items():
-            if method.startswith("x-") or not isinstance(op, dict):
-                continue
-            op["x-source-evidence"] = evidence
-            for param in op.get("parameters") or []:
-                if isinstance(param, dict):
-                    param["x-source-evidence"] = evidence
+    annotate_node(spec, evidence)
 
 
-def apply_example_fallback(spec: dict, evidence_file: str, evidence_line: str) -> bool:
-    example = extract_response_example(spec, "200")
-    if example is None:
-        return False
-    op_info = first_operation(spec)
-    if not op_info:
-        return False
-    _, _, op = op_info
-    resp = (op.get("responses") or {}).get("200") or {}
-    for body in (resp.get("content") or {}).values():
-        body["schema"] = infer_schema_from_example(example, evidence_file, evidence_line)
-    spec["x-readiness"] = "example-fallback"
-    spec["x-readiness-notes"] = (
-        "Response 200 schema inferred from official example because formal schema is empty."
-    )
-    return True
+def apply_example_fallback(
+    spec: dict, evidence_file: str, evidence_line: str
+) -> tuple[bool, set[str]]:
+    changed = False
+    filled: set[str] = set()
+    for _path, _method, op in iter_operations(spec):
+        for status, resp in (op.get("responses") or {}).items():
+            for body in (resp.get("content") or {}).values():
+                schema = body.get("schema") or {}
+                if not schema_is_empty(schema, body):
+                    continue
+                example = media_type_example(body)
+                if example is None:
+                    continue
+                body["schema"] = infer_schema_from_example(example, evidence_file, evidence_line)
+                changed = True
+                filled.add(status)
+    if changed:
+        spec["x-readiness"] = "example-fallback"
+        spec["x-readiness-notes"] = (
+            "Missing response schemas inferred from official examples because formal schemas are empty."
+        )
+    return changed, filled
 
 
 def yaml_scalar(value: object) -> str:
@@ -184,6 +272,11 @@ def yaml_scalar(value: object) -> str:
     if isinstance(value, (int, float)):
         return str(value)
     text = str(value)
+    lower = text.lower()
+    if lower in {"true", "false", "null", "yes", "no", "on", "off"}:
+        return json.dumps(text, ensure_ascii=False)
+    if re.fullmatch(r"-?\d+(?:\.\d+)?", text):
+        return json.dumps(text, ensure_ascii=False)
     if text == "" or any(c in text for c in ':{}[],&*#?|<>=!%@\\"'):
         return json.dumps(text, ensure_ascii=False)
     return text
@@ -194,9 +287,18 @@ def dump_yaml(value: object, indent: int = 0) -> list[str]:
     if isinstance(value, dict):
         lines: list[str] = []
         for key, child in value.items():
-            if isinstance(child, (dict, list)):
-                lines.append(f"{pad}{yaml_scalar(key)}:")
-                lines.extend(dump_yaml(child, indent + 2))
+            if isinstance(child, dict):
+                if child:
+                    lines.append(f"{pad}{yaml_scalar(key)}:")
+                    lines.extend(dump_yaml(child, indent + 2))
+                else:
+                    lines.append(f"{pad}{yaml_scalar(key)}: {{}}")
+            elif isinstance(child, list):
+                if child:
+                    lines.append(f"{pad}{yaml_scalar(key)}:")
+                    lines.extend(dump_yaml(child, indent + 2))
+                else:
+                    lines.append(f"{pad}{yaml_scalar(key)}: []")
             else:
                 lines.append(f"{pad}{yaml_scalar(key)}: {yaml_scalar(child)}")
         return lines
@@ -219,6 +321,13 @@ def dump_openapi_yaml(spec: dict) -> str:
     return "\n".join(dump_yaml(spec)) + "\n"
 
 
+def auth_evidence(material_root: Path, _spec: dict) -> tuple[str, str]:
+    auth_md = material_root / "source/raw/authentication.md"
+    if auth_md.is_file() and "CG-API-KEY" in auth_md.read_text(encoding="utf-8"):
+        return "sourced", "source/raw/authentication.md:22-33"
+    return "missing", "—"
+
+
 def build_report(
     *,
     material_root: Path,
@@ -227,17 +336,31 @@ def build_report(
     schema_gate: str,
     strictness: str,
     endpoint_evidence: str,
-    empty_200: bool,
+    empty_responses: list[tuple[str, str, str]],
+    inferred_response_statuses: set[str],
+    auth_status: str,
+    auth_evidence_line: str,
     output_note: str,
 ) -> str:
-    status = "inferred-from-example" if strictness == "example-fallback" and empty_200 else (
-        "missing" if empty_200 else "sourced"
-    )
+    empty_statuses = {status for _, _, status in empty_responses} | inferred_response_statuses
+    response_checklist = ""
+    for status in sorted(empty_statuses, key=int):
+        row_status = "inferred-from-example" if status in inferred_response_statuses else "missing"
+        response_checklist += (
+            f"| Response {status} formal schema | {row_status} | "
+            f"source/raw/fr-ohlc-histroy.md:20-41,153-157 | embedded OpenAPI schema properties empty |\n"
+        )
+    if not response_checklist:
+        response_checklist = (
+            "| Response 200 formal schema | sourced | "
+            f"source/raw/fr-ohlc-histroy.md:20-41,153-157 | formal schema present |\n"
+        )
     user_decision = ""
     if strictness == "strict" and schema_gate == "NO-GO":
-        user_decision = """
+        gap_summary = ", ".join(f"{status}" for _, _, status in empty_responses) or "Response schema"
+        user_decision = f"""
 ## User Decision Required
-Schema gate **NO-GO** — blocking gap: Response 200 formal schema is missing.
+Schema gate **NO-GO** — blocking gap: formal schema missing for documented response(s): {gap_summary}.
 
 Reply with one option number:
 
@@ -246,21 +369,29 @@ Reply with one option number:
 3. **Reduced scope** — exclude missing elements from the spec (`out_of_scope`) and generate only the sourced contract.
 4. **Stop** — keep `docs/openapi-readiness-report.md` only; do not write `schema/openapi.yaml`.
 """
-    elif strictness == "example-fallback":
+    elif strictness == "example-fallback" and schema_gate != "NO-GO":
         user_decision = """
 ## User Decision Applied
 User selected option 2: **Example fallback**. Missing response schema fields are inferred only from Tier A/B documented examples and marked with `x-inferred-from: example`.
 """
-    gaps_heading = (
-        "## Gaps Resolved By User Decision"
-        if strictness == "example-fallback"
-        else "## Gaps (blocking schema generation)"
-    )
-    gap_suggestion = (
-        "resolved by option 2 example-fallback; inferred fields are marked"
-        if strictness == "example-fallback"
-        else "cannot assemble strict schema; run strict-api-extraction or approve reduced scope"
-    )
+    gaps_section = ""
+    if schema_gate == "NO-GO" or empty_responses:
+        gaps_heading = (
+            "## Gaps Resolved By User Decision"
+            if strictness == "example-fallback" and schema_gate != "NO-GO"
+            else "## Gaps (blocking schema generation)"
+        )
+        gap_rows = "\n".join(
+            f"| Response {status} formal schema ({path} {method}) | official embedded schema empty | "
+            f"{'resolved by option 2 example-fallback' if strictness == 'example-fallback' and schema_gate != 'NO-GO' else 'cannot assemble strict schema; run strict-api-extraction or approve reduced scope'} |"
+            for path, method, status in empty_responses
+        ) or "| Response formal schema | official embedded schema empty | cannot assemble strict schema |"
+        gaps_section = f"""
+{gaps_heading}
+| Element | What's missing | Suggested action |
+| --- | --- | --- |
+{gap_rows}
+"""
     return f"""# OpenAPI Readiness: CoinGlass fr-ohlc-histroy
 
 ## Summary
@@ -286,15 +417,8 @@ User selected option 2: **Example fallback**. Missing response schema fields are
 | --- | --- | --- | --- |
 | GET /api/futures/funding-rate/history | sourced | {endpoint_evidence} | operationId fr-ohlc-histroy |
 | Request body (GET) | N/A | — | GET has no body |
-| Response 200 formal schema | {status} | source/raw/fr-ohlc-histroy.md:20-41,153-157 | embedded OpenAPI schema properties empty |
-| Authentication CG-API-KEY | sourced | source/raw/authentication.md:22-33 | |
-
-{gaps_heading}
-| Element | What's missing | Suggested action |
-| --- | --- | --- |
-| Response 200 formal JSON Schema | official embedded OpenAPI `schema.properties` empty | {gap_suggestion} |
-{user_decision}
-
+{response_checklist}| Authentication CG-API-KEY | {auth_status} | {auth_evidence_line} | |
+{gaps_section}{user_decision}
 ## Next Step
 Schema **{schema_gate}** — {'do not write `schema/openapi.yaml` in strict mode' if schema_gate == 'NO-GO' else 'run api-client-generator on schema/openapi.yaml'}.
 """
@@ -329,21 +453,36 @@ def main() -> int:
         print("ERROR: could not parse embedded OpenAPI from fr-ohlc-histroy.md", file=sys.stderr)
         return 1
 
-    empty_200 = response_schema_empty(spec)
-    if empty_200 and args.strictness == "example-fallback":
-        if not apply_example_fallback(spec, "source/raw/fr-ohlc-histroy.md", "20-41"):
-            print("ERROR: example-fallback requested but no parseable 200 example found", file=sys.stderr)
-            return 1
-        schema_gate = "GO (example-fallback)"
-    else:
-        schema_gate = "NO-GO" if empty_200 else "GO"
-    extraction_gate = "GO"
+    empty_responses = find_empty_response_schemas(spec)
+    inferred_response_statuses: set[str] = set()
+    extraction_gate = "n/a"
     if (material_root / "docs/api-source-report.md").is_file():
         report_text = (material_root / "docs/api-source-report.md").read_text(encoding="utf-8")
         if "Gate: **GO**" in report_text:
             extraction_gate = "GO"
         elif "Gate: **NO-GO**" in report_text:
             extraction_gate = "NO-GO"
+
+    auth_status, auth_evidence_line = auth_evidence(material_root, spec)
+
+    if extraction_gate == "NO-GO":
+        schema_gate = "NO-GO"
+    elif empty_responses and args.strictness == "example-fallback":
+        changed, inferred_response_statuses = apply_example_fallback(
+            spec, "source/raw/fr-ohlc-histroy.md", "20-41"
+        )
+        if not changed:
+            print("ERROR: example-fallback requested but no parseable examples found", file=sys.stderr)
+            return 1
+        empty_responses = find_empty_response_schemas(spec)
+        if empty_responses or auth_status == "missing":
+            schema_gate = "NO-GO"
+        else:
+            schema_gate = "GO (example-fallback)"
+    elif empty_responses or auth_status == "missing":
+        schema_gate = "NO-GO"
+    else:
+        schema_gate = "GO"
 
     endpoint_evidence = f"source/raw/fr-ohlc-histroy.md:{json_line or 73}-77"
     output_note = "(none — gaps only)" if schema_gate == "NO-GO" else "`schema/openapi.yaml`"
@@ -359,7 +498,10 @@ def main() -> int:
         schema_gate=schema_gate,
         strictness=args.strictness,
         endpoint_evidence=endpoint_evidence,
-        empty_200=empty_200,
+        empty_responses=empty_responses,
+        inferred_response_statuses=inferred_response_statuses,
+        auth_status=auth_status,
+        auth_evidence_line=auth_evidence_line,
         output_note=output_note,
     )
     (docs_dir / "openapi-readiness-report.md").write_text(report, encoding="utf-8")
