@@ -1,5 +1,5 @@
-# strict-api-extraction local test runs and fixtures
-skills/dy-api-extraction/strict-api-extraction/test/
+# skill test fixtures and local verification runs
+**/test/
 
 # strict-api-extraction runtime outputs (agents should add these to target project .gitignore too)
 .firecrawl/
