@@ -1,0 +1,13 @@
+# skill test fixtures and local verification runs
+**/test/
+
+# strict-api-extraction runtime outputs (agents should add these to target project .gitignore too)
+.firecrawl/
+.local/
+
+# git worktrees
+.worktrees/
+
+# python bytecode cache
+__pycache__/
+*.pyc

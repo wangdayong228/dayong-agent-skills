@@ -14,6 +14,8 @@
 | `affected-path-review` | 任何 code review、PR review、review 子代理或 review comments 处理；将审查范围从 diff 扩展到完整行为路径 |
 | `pr-comment-review` | 拉取、评估、处理或汇总 GitHub PR 评论与可执行的 review thread |
 | `iterative-code-review` | 要求子代理/AI reviewer 审查本地改动，并由主代理循环修复直至通过 |
+| `strict-api-extraction` | 从官方 API 文档站完整采集原始素材（`source/raw` + `source/snapshots`）并产出 `api-source-report.md`；coverage 不足时继续抓取，禁止猜测未文档化的 schema 元素。**依赖：** 需单独安装 `ego-browser`；可选 `firecrawl-scrape` / `firecrawl-map` |
+| `openapi-from-sources` | 基于已有素材（含 strict-api-extraction 产出）校验是否足够生成 OpenAPI 3.x；strict NO-GO 时报告 4 个编号选项，用户选 example-fallback 后可从官方 example 生成带标注的 `schema/openapi.yaml`。**依赖：** 素材需已采集；下游可用 `api-client-generator` |
 
 例外：若你明确要求 `diff-only review`，则只审查 diff，不会按 `affected-path-review` 扩展到完整行为路径。
 
@@ -21,11 +23,14 @@
 
 ```text
 skills/
-  <skill-name>/
-    SKILL.md
-    agents/
-      openai.yaml
+  <category>/
+    <skill-name>/
+      SKILL.md
+      agents/
+        openai.yaml
 ```
+
+同一 category 下放置职责相关的 skills（如 `dy-code-review/`、`dy-api-extraction/`）。新增独立职责域时再建 category；否则放入已有 category。
 
 `agents/openai.yaml` 为可选元数据文件；跨代理场景优先读取 `SKILL.md`。
 
@@ -47,6 +52,9 @@ npx skills add wangdayong228/dayong-agent-skills --all -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill affected-path-review -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill pr-comment-review -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill iterative-code-review -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill strict-api-extraction -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill openapi-from-sources -g -y
+# strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 ```
 
 **安装单个 skill（`@` 简写）：**
@@ -55,6 +63,9 @@ npx skills add wangdayong228/dayong-agent-skills --skill iterative-code-review -
 npx skills add wangdayong228/dayong-agent-skills@affected-path-review -g -y
 npx skills add wangdayong228/dayong-agent-skills@pr-comment-review -g -y
 npx skills add wangdayong228/dayong-agent-skills@iterative-code-review -g -y
+npx skills add wangdayong228/dayong-agent-skills@strict-api-extraction -g -y
+npx skills add wangdayong228/dayong-agent-skills@openapi-from-sources -g -y
+# strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 ```
 
 ## 更新

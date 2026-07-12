@@ -1,0 +1,4 @@
+interface:
+  display_name: "OpenAPI From Sources"
+  short_description: "Validate API source materials and assemble OpenAPI 3.x in strict mode, or report gaps."
+  default_prompt: "Use openapi-from-sources to validate existing API source materials in strict mode, run the readiness checklist, and either write schema/openapi.yaml with x-source-evidence or docs/openapi-readiness-report.md listing blocking gaps."
