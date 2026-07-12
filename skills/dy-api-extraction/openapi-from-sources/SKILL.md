@@ -149,7 +149,7 @@ Example-fallback fixture mode:
   /path/to/material-root /path/to/output-dir --strictness example-fallback
 ```
 
-Offline generation test from committed fixture:
+Offline generation test from the local fixture (test directories are gitignored; clone or copy the fixture locally first):
 
 ```bash
 ./skills/dy-api-extraction/openapi-from-sources/test/coinglass-fr-ohlc-history/verify.sh

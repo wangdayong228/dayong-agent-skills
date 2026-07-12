@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 
+HTTP_METHODS = ("get", "post", "put", "patch", "delete", "options", "head", "trace")
 def strip_json_line_comments(text: str) -> str:
     """Remove // comments only outside JSON string literals."""
     out_lines: list[str] = []
@@ -64,7 +65,7 @@ def parse_example_value(value: object) -> object | None:
         try:
             return json.loads(strip_json_line_comments(value))
         except json.JSONDecodeError:
-            return None
+            return value
     return value
 
 
@@ -83,6 +84,8 @@ def schema_is_empty(schema: dict, body: dict | None = None) -> bool:
         return False
     if schema.get("$ref"):
         return False
+    if any(schema.get(key) for key in ("allOf", "oneOf", "anyOf")):
+        return False
     if not schema:
         return True
     if schema.get("additionalProperties") is not None:
@@ -91,6 +94,8 @@ def schema_is_empty(schema: dict, body: dict | None = None) -> bool:
     if props:
         return False
     schema_type = schema.get("type")
+    if schema_type == "array":
+        return "items" not in schema
     if schema_type and schema_type != "object":
         return False
     return True
@@ -99,7 +104,7 @@ def schema_is_empty(schema: dict, body: dict | None = None) -> bool:
 def find_empty_response_schemas(spec: dict) -> list[tuple[str, str, str]]:
     missing: list[tuple[str, str, str]] = []
     for path, item in (spec.get("paths") or {}).items():
-        for method in ("get", "post", "put", "patch", "delete"):
+        for method in HTTP_METHODS:
             op = item.get(method)
             if not op:
                 continue
@@ -122,10 +127,24 @@ def find_empty_response_schemas(spec: dict) -> list[tuple[str, str, str]]:
 
 def iter_operations(spec: dict):
     for path, item in (spec.get("paths") or {}).items():
-        for method in ("get", "post", "put", "patch", "delete"):
+        for method in HTTP_METHODS:
             op = item.get(method)
             if op:
                 yield path, method, op
+
+
+def merge_array_item_schema(items: list, evidence_file: str, evidence_line: str) -> dict:
+    item_schema = infer_schema_from_example(items[0], evidence_file, evidence_line)
+    if item_schema.get("type") != "object" or not isinstance(items[0], dict):
+        return item_schema
+    props = item_schema.setdefault("properties", {})
+    for item in items[1:]:
+        if not isinstance(item, dict):
+            continue
+        for key, val in item.items():
+            if key not in props:
+                props[key] = infer_schema_from_example(val, evidence_file, evidence_line)
+    return item_schema
 
 
 def infer_schema_from_example(value: object, evidence_file: str, evidence_line: str) -> dict:
@@ -155,7 +174,7 @@ def infer_schema_from_example(value: object, evidence_file: str, evidence_line: 
             }
         return {
             "type": "array",
-            "items": infer_schema_from_example(value[0], evidence_file, evidence_line),
+            "items": merge_array_item_schema(value, evidence_file, evidence_line),
             "x-source-evidence": evidence,
             "x-inferred-from": "example",
         }
@@ -210,16 +229,35 @@ def annotate_node(node: object, evidence: list[dict]) -> None:
         if isinstance(props, dict):
             for prop_schema in props.values():
                 annotate_node(prop_schema, evidence)
-        for key in ("content", "responses", "requestBody", "components"):
+        for key in ("requestBody", "components"):
             child = node.get(key)
             if isinstance(child, dict):
                 annotate_node(child, evidence)
+        responses = node.get("responses")
+        if isinstance(responses, dict):
+            for resp in responses.values():
+                if isinstance(resp, dict):
+                    annotate_node(resp, evidence)
+        content = node.get("content")
+        if isinstance(content, dict):
+            for body in content.values():
+                if isinstance(body, dict):
+                    annotate_node(body, evidence)
+        schemes = node.get("securitySchemes")
+        if isinstance(schemes, dict):
+            for scheme in schemes.values():
+                if isinstance(scheme, dict):
+                    annotate_node(scheme, evidence)
+        servers = node.get("servers")
+        if isinstance(servers, list):
+            for server in servers:
+                annotate_node(server, evidence)
         paths = node.get("paths")
         if isinstance(paths, dict):
             for path_item in paths.values():
                 if isinstance(path_item, dict):
                     annotate_node(path_item, evidence)
-        for method in ("get", "post", "put", "patch", "delete"):
+        for method in HTTP_METHODS:
             op = node.get(method)
             if isinstance(op, dict):
                 annotate_node(op, evidence)
@@ -277,9 +315,46 @@ def yaml_scalar(value: object) -> str:
         return json.dumps(text, ensure_ascii=False)
     if re.fullmatch(r"-?\d+(?:\.\d+)?", text):
         return json.dumps(text, ensure_ascii=False)
-    if text == "" or any(c in text for c in ':{}[],&*#?|<>=!%@\\"'):
+    if text == "" or "\n" in text or any(c in text for c in ':{}[],&*#?|<>=!%@\\"'):
         return json.dumps(text, ensure_ascii=False)
     return text
+
+
+def response_status_sort_key(status: str) -> tuple[int, str | int]:
+    if status.isdigit():
+        return (0, int(status))
+    return (1, status)
+
+
+def validate_openapi_fragment(spec: dict) -> bool:
+    if not isinstance(spec, dict):
+        return False
+    if not str(spec.get("openapi", "")).startswith("3."):
+        return False
+    paths = spec.get("paths")
+    return isinstance(paths, dict) and bool(paths)
+
+
+def servers_ready(spec: dict) -> bool:
+    servers = spec.get("servers") or []
+    return bool(servers) and all(isinstance(item, dict) and item.get("url") for item in servers)
+
+
+def extraction_schema_gaps(report_text: str) -> list[str]:
+    gaps: list[str] = []
+    for line in report_text.splitlines():
+        if "missing_from_docs" not in line or "|" not in line:
+            continue
+        parts = [part.strip() for part in line.split("|")]
+        if len(parts) < 3:
+            continue
+        element = parts[1]
+        if not element or element == "Element":
+            continue
+        lowered = element.lower()
+        if any(token in lowered for token in ("schema", "response", "field type", "formal")):
+            gaps.append(element)
+    return gaps
 
 
 def dump_yaml(value: object, indent: int = 0) -> list[str]:
@@ -321,11 +396,21 @@ def dump_openapi_yaml(spec: dict) -> str:
     return "\n".join(dump_yaml(spec)) + "\n"
 
 
-def auth_evidence(material_root: Path, _spec: dict) -> tuple[str, str]:
+def auth_evidence(material_root: Path, spec: dict) -> tuple[str, str]:
     auth_md = material_root / "source/raw/authentication.md"
-    if auth_md.is_file() and "CG-API-KEY" in auth_md.read_text(encoding="utf-8"):
-        return "sourced", "source/raw/authentication.md:22-33"
-    return "missing", "—"
+    if not (auth_md.is_file() and "CG-API-KEY" in auth_md.read_text(encoding="utf-8")):
+        return "missing", "—"
+    schemes = spec.get("components", {}).get("securitySchemes") or {}
+    has_scheme = any(
+        isinstance(scheme, dict) and scheme.get("name") == "CG-API-KEY" for scheme in schemes.values()
+    )
+    has_security = bool(spec.get("security"))
+    if not has_scheme or not has_security:
+        return (
+            "missing",
+            "source/raw/authentication.md:22-33 (auth doc present but embedded spec lacks securitySchemes/security)",
+        )
+    return "sourced", "source/raw/authentication.md:22-33"
 
 
 def build_report(
@@ -340,11 +425,13 @@ def build_report(
     inferred_response_statuses: set[str],
     auth_status: str,
     auth_evidence_line: str,
+    servers_status: str,
+    report_schema_gaps: list[str],
     output_note: str,
 ) -> str:
     empty_statuses = {status for _, _, status in empty_responses} | inferred_response_statuses
     response_checklist = ""
-    for status in sorted(empty_statuses, key=int):
+    for status in sorted(empty_statuses, key=response_status_sort_key):
         row_status = "inferred-from-example" if status in inferred_response_statuses else "missing"
         response_checklist += (
             f"| Response {status} formal schema | {row_status} | "
@@ -375,7 +462,7 @@ Reply with one option number:
 User selected option 2: **Example fallback**. Missing response schema fields are inferred only from Tier A/B documented examples and marked with `x-inferred-from: example`.
 """
     gaps_section = ""
-    if schema_gate == "NO-GO" or empty_responses:
+    if schema_gate == "NO-GO" or empty_responses or report_schema_gaps:
         gaps_heading = (
             "## Gaps Resolved By User Decision"
             if strictness == "example-fallback" and schema_gate != "NO-GO"
@@ -385,7 +472,14 @@ User selected option 2: **Example fallback**. Missing response schema fields are
             f"| Response {status} formal schema ({path} {method}) | official embedded schema empty | "
             f"{'resolved by option 2 example-fallback' if strictness == 'example-fallback' and schema_gate != 'NO-GO' else 'cannot assemble strict schema; run strict-api-extraction or approve reduced scope'} |"
             for path, method, status in empty_responses
-        ) or "| Response formal schema | official embedded schema empty | cannot assemble strict schema |"
+        )
+        for gap in report_schema_gaps:
+            gap_rows += (
+                f"\n| {gap} | extraction report marked missing_from_docs | "
+                "cannot assemble strict schema until sourced or user approves reduced scope / example-fallback |"
+            )
+        if not gap_rows:
+            gap_rows = "| Response formal schema | official embedded schema empty | cannot assemble strict schema |"
         gaps_section = f"""
 {gaps_heading}
 | Element | What's missing | Suggested action |
@@ -417,7 +511,8 @@ User selected option 2: **Example fallback**. Missing response schema fields are
 | --- | --- | --- | --- |
 | GET /api/futures/funding-rate/history | sourced | {endpoint_evidence} | operationId fr-ohlc-histroy |
 | Request body (GET) | N/A | — | GET has no body |
-{response_checklist}| Authentication CG-API-KEY | {auth_status} | {auth_evidence_line} | |
+{response_checklist}| Servers.url | {servers_status} | source/raw/fr-ohlc-histroy.md:53-56 | |
+| Authentication CG-API-KEY | {auth_status} | {auth_evidence_line} | |
 {gaps_section}{user_decision}
 ## Next Step
 Schema **{schema_gate}** — {'do not write `schema/openapi.yaml` in strict mode' if schema_gate == 'NO-GO' else 'run api-client-generator on schema/openapi.yaml'}.
@@ -453,19 +548,28 @@ def main() -> int:
         print("ERROR: could not parse embedded OpenAPI from fr-ohlc-histroy.md", file=sys.stderr)
         return 1
 
+    if spec is None or not validate_openapi_fragment(spec):
+        print("ERROR: embedded OpenAPI fragment is missing openapi 3.x paths", file=sys.stderr)
+        return 1
+
     empty_responses = find_empty_response_schemas(spec)
     inferred_response_statuses: set[str] = set()
     extraction_gate = "n/a"
+    report_schema_gaps: list[str] = []
     if (material_root / "docs/api-source-report.md").is_file():
         report_text = (material_root / "docs/api-source-report.md").read_text(encoding="utf-8")
+        report_schema_gaps = extraction_schema_gaps(report_text)
         if "Gate: **GO**" in report_text:
             extraction_gate = "GO"
         elif "Gate: **NO-GO**" in report_text:
             extraction_gate = "NO-GO"
 
     auth_status, auth_evidence_line = auth_evidence(material_root, spec)
+    servers_status = "sourced" if servers_ready(spec) else "missing"
 
     if extraction_gate == "NO-GO":
+        schema_gate = "NO-GO"
+    elif args.strictness == "strict" and report_schema_gaps:
         schema_gate = "NO-GO"
     elif empty_responses and args.strictness == "example-fallback":
         changed, inferred_response_statuses = apply_example_fallback(
@@ -475,11 +579,11 @@ def main() -> int:
             print("ERROR: example-fallback requested but no parseable examples found", file=sys.stderr)
             return 1
         empty_responses = find_empty_response_schemas(spec)
-        if empty_responses or auth_status == "missing":
+        if empty_responses or auth_status == "missing" or servers_status == "missing":
             schema_gate = "NO-GO"
         else:
             schema_gate = "GO (example-fallback)"
-    elif empty_responses or auth_status == "missing":
+    elif empty_responses or auth_status == "missing" or servers_status == "missing":
         schema_gate = "NO-GO"
     else:
         schema_gate = "GO"
@@ -502,6 +606,8 @@ def main() -> int:
         inferred_response_statuses=inferred_response_statuses,
         auth_status=auth_status,
         auth_evidence_line=auth_evidence_line,
+        servers_status=servers_status,
+        report_schema_gaps=report_schema_gaps if args.strictness == "strict" else [],
         output_note=output_note,
     )
     (docs_dir / "openapi-readiness-report.md").write_text(report, encoding="utf-8")

@@ -7,3 +7,7 @@
 
 # git worktrees
 .worktrees/
+
+# python bytecode cache
+__pycache__/
+*.pyc
