@@ -69,14 +69,29 @@ def parse_example_value(value: object) -> object | None:
     return value
 
 
+def merge_example_values(current: object | None, new_value: object | None) -> object | None:
+    if new_value is None:
+        return current
+    if current is None:
+        return new_value
+    if isinstance(current, dict) and isinstance(new_value, dict):
+        merged = dict(current)
+        for key, value in new_value.items():
+            merged[key] = merge_example_values(merged.get(key), value)
+        return merged
+    if isinstance(current, list) and isinstance(new_value, list):
+        return [*current, *new_value]
+    return current
+
+
 def media_type_example(body: dict) -> object | None:
+    merged: object | None = None
     if "example" in body:
-        return parse_example_value(body["example"])
+        merged = merge_example_values(merged, parse_example_value(body["example"]))
     for example in (body.get("examples") or {}).values():
         parsed = parse_example_value(example.get("value"))
-        if parsed is not None:
-            return parsed
-    return None
+        merged = merge_example_values(merged, parsed)
+    return merged
 
 
 def resolve_local_ref(spec: dict, ref: str) -> dict | None:
@@ -165,10 +180,19 @@ def schema_is_empty(
 
 def iter_operation_items(spec: dict):
     for path, item in (spec.get("paths") or {}).items():
+        if isinstance(item, dict):
+            item = resolve_ref_object(spec, item)
         for method in HTTP_METHODS:
             op = item.get(method)
             if op:
                 yield path, item, method, op
+
+
+def response_has_explicit_no_body(status: str, resp: dict) -> bool:
+    if status in {"204", "304"}:
+        return True
+    description = str(resp.get("description", "")).lower()
+    return "no content" in description or "no body" in description
 
 
 def find_empty_response_schemas(spec: dict) -> list[tuple[str, str, str]]:
@@ -179,6 +203,8 @@ def find_empty_response_schemas(spec: dict) -> list[tuple[str, str, str]]:
                 resp = resolve_ref_object(spec, resp)
             content = resp.get("content") or {}
             if not content:
+                if not response_has_explicit_no_body(str(status), resp):
+                    missing.append((path, method, status))
                 continue
             for _mime, body in content.items():
                 schema = body.get("schema") or {}
@@ -238,6 +264,15 @@ def find_schema_blockers(spec: dict) -> list[dict[str, str]]:
         request_body = op.get("requestBody") or {}
         if isinstance(request_body, dict):
             request_body = resolve_ref_object(spec, request_body)
+        if "requestBody" in op and not (request_body.get("content") or {}):
+            blockers.append(
+                {
+                    "kind": "requestBody",
+                    "element": f"Request body schema ({path} {method})",
+                    "path": path,
+                    "method": method,
+                }
+            )
         for body in (request_body.get("content") or {}).values():
             schema = body.get("schema") or {}
             if schema_is_empty(schema, spec=spec):
@@ -465,6 +500,8 @@ def yaml_scalar(value: object) -> str:
         return json.dumps(text, ensure_ascii=False)
     if re.fullmatch(r"-?\d+(?:\.\d+)?", text):
         return json.dumps(text, ensure_ascii=False)
+    if text.startswith(("- ", "? ", ": ")):
+        return json.dumps(text, ensure_ascii=False)
     if text == "" or "\n" in text or any(c in text for c in ':{}[],&*#?|<>=!%@\\"'):
         return json.dumps(text, ensure_ascii=False)
     return text
@@ -480,6 +517,15 @@ def validate_openapi_fragment(spec: dict) -> bool:
     if not isinstance(spec, dict):
         return False
     if not str(spec.get("openapi", "")).startswith("3."):
+        return False
+    info = spec.get("info")
+    if not (
+        isinstance(info, dict)
+        and isinstance(info.get("title"), str)
+        and info.get("title")
+        and isinstance(info.get("version"), str)
+        and info.get("version")
+    ):
         return False
     paths = spec.get("paths")
     return isinstance(paths, dict) and bool(paths)
@@ -524,9 +570,7 @@ def extraction_schema_gaps(report_text: str) -> list[str]:
         element = parts[1]
         if not element or element == "Element":
             continue
-        lowered = element.lower()
-        if any(token in lowered for token in ("schema", "response", "field type", "formal")):
-            gaps.append(element)
+        gaps.append(element)
     return gaps
 
 
@@ -577,17 +621,32 @@ def auth_evidence(material_root: Path, spec: dict) -> tuple[str, str]:
     matching_scheme_names = {
         name
         for name, scheme in schemes.items()
-        if isinstance(scheme, dict) and scheme.get("name") == "CG-API-KEY"
+        if (
+            isinstance(scheme, dict)
+            and scheme.get("type") == "apiKey"
+            and scheme.get("in") == "header"
+            and scheme.get("name") == "CG-API-KEY"
+        )
     }
     has_scheme = bool(matching_scheme_names)
     root_security = spec.get("security")
-    has_security = bool(matching_scheme_names & security_requirement_names(root_security))
-    if not has_security:
-        for _path, item, _method, op in iter_operation_items(spec):
-            scoped_security = op.get("security") or item.get("security")
-            if matching_scheme_names & security_requirement_names(scoped_security):
-                has_security = True
-                break
+    operations = list(iter_operation_items(spec))
+    if operations:
+        has_security = all(
+            bool(
+                matching_scheme_names
+                & security_requirement_names(
+                    op["security"]
+                    if "security" in op
+                    else item["security"]
+                    if "security" in item
+                    else root_security
+                )
+            )
+            for _path, item, _method, op in operations
+        )
+    else:
+        has_security = bool(matching_scheme_names & security_requirement_names(root_security))
     if not has_scheme or not has_security:
         return (
             "missing",

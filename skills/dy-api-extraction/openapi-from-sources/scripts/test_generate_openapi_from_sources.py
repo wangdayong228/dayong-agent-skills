@@ -322,6 +322,175 @@ class OpenAPIFromSourcesTests(unittest.TestCase):
         self.assertEqual("object", body["schema"]["type"])
         self.assertEqual([], generator.find_empty_response_schemas(spec))
 
+    def test_path_item_refs_are_resolved_before_readiness_checks(self) -> None:
+        spec = {
+            "openapi": "3.1.0",
+            "info": {"title": "Users", "version": "1.0.0"},
+            "paths": {
+                "/users": {"$ref": "#/components/pathItems/UsersPath"},
+            },
+            "components": {
+                "pathItems": {
+                    "UsersPath": {
+                        "get": {
+                            "responses": {
+                                "200": {
+                                    "content": {
+                                        "application/json": {
+                                            "schema": {
+                                                "type": "object",
+                                                "properties": {"id": {}},
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        }
+
+        self.assertEqual(
+            [("/users", "get", "200")],
+            generator.find_empty_response_schemas(spec),
+        )
+
+    def test_contentless_non_empty_responses_are_schema_gaps(self) -> None:
+        spec = {
+            "openapi": "3.1.0",
+            "info": {"title": "Users", "version": "1.0.0"},
+            "paths": {
+                "/users": {
+                    "get": {
+                        "responses": {
+                            "200": {"description": "OK"},
+                            "204": {"description": "No content"},
+                        }
+                    }
+                }
+            },
+        }
+
+        self.assertEqual(
+            [("/users", "get", "200")],
+            generator.find_empty_response_schemas(spec),
+        )
+
+    def test_request_body_without_content_is_blocking(self) -> None:
+        spec = {
+            "openapi": "3.1.0",
+            "info": {"title": "Users", "version": "1.0.0"},
+            "paths": {
+                "/users": {
+                    "post": {
+                        "requestBody": {"description": "Create user"},
+                        "responses": {"204": {"description": "No content"}},
+                    }
+                }
+            },
+        }
+
+        self.assertIn(
+            "Request body schema (/users post)",
+            {blocker["element"] for blocker in generator.find_schema_blockers(spec)},
+        )
+
+    def test_extraction_missing_from_docs_rows_are_all_schema_gaps(self) -> None:
+        report_text = """| Element | Status | Evidence |
+| --- | --- | --- |
+| User.email type | missing_from_docs | source/raw/users.md:10 |
+| Error object | missing_from_docs | source/raw/errors.md:5 |
+| Cross-ref instruments | missing_from_docs | source/raw/users.md:12 |
+"""
+
+        self.assertEqual(
+            ["User.email type", "Error object", "Cross-ref instruments"],
+            generator.extraction_schema_gaps(report_text),
+        )
+
+    def test_yaml_scalar_quotes_indicator_prefixes(self) -> None:
+        self.assertEqual('"- deprecated"', generator.yaml_scalar("- deprecated"))
+        self.assertEqual('"?: value"', generator.yaml_scalar("?: value"))
+        self.assertEqual('": value"', generator.yaml_scalar(": value"))
+
+    def test_auth_requires_api_key_header_and_honors_operation_overrides(self) -> None:
+        base_spec = {
+            "openapi": "3.1.0",
+            "info": {"title": "Users", "version": "1.0.0"},
+            "components": {
+                "securitySchemes": {
+                    "ApiKeyAuth": {
+                        "type": "apiKey",
+                        "in": "header",
+                        "name": "CG-API-KEY",
+                    }
+                }
+            },
+            "security": [{"ApiKeyAuth": []}],
+            "paths": {
+                "/users": {
+                    "get": {
+                        "responses": {"204": {"description": "No content"}},
+                    }
+                }
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            material_root = Path(tmp)
+            raw = material_root / "source" / "raw"
+            raw.mkdir(parents=True)
+            (raw / "authentication.md").write_text("Use CG-API-KEY header\n", encoding="utf-8")
+
+            wrong_location = dict(base_spec)
+            wrong_location["components"] = {
+                "securitySchemes": {
+                    "ApiKeyAuth": {
+                        "type": "apiKey",
+                        "in": "query",
+                        "name": "CG-API-KEY",
+                    }
+                }
+            }
+            self.assertEqual("missing", generator.auth_evidence(material_root, wrong_location)[0])
+
+            disabled = dict(base_spec)
+            disabled["paths"] = {
+                "/users": {
+                    "get": {
+                        "security": [],
+                        "responses": {"204": {"description": "No content"}},
+                    }
+                }
+            }
+            self.assertEqual("missing", generator.auth_evidence(material_root, disabled)[0])
+
+    def test_validate_openapi_fragment_requires_info(self) -> None:
+        self.assertFalse(
+            generator.validate_openapi_fragment(
+                {"openapi": "3.1.0", "paths": {"/users": {"get": {}}}}
+            )
+        )
+        self.assertTrue(
+            generator.validate_openapi_fragment(
+                {
+                    "openapi": "3.1.0",
+                    "info": {"title": "Users", "version": "1.0.0"},
+                    "paths": {"/users": {"get": {}}},
+                }
+            )
+        )
+
+    def test_example_fallback_merges_all_named_examples(self) -> None:
+        body = {
+            "examples": {
+                "first": {"value": {"id": "abc"}},
+                "second": {"value": {"name": "Ada"}},
+            }
+        }
+
+        self.assertEqual({"id": "abc", "name": "Ada"}, generator.media_type_example(body))
+
     def test_user_decision_summary_names_non_response_blockers(self) -> None:
         report = generator.build_report(
             material_root=Path("/tmp/material"),
