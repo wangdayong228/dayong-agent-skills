@@ -38,4 +38,4 @@
 [Brief round-by-round notes]
 
 ## Next Step
-Sources ready for schema assembly only when Gate is **GO**. Do not assemble until user requests it.
+Sources ready for schema assembly only when Gate is **GO**. Do not assemble until user requests it — use `openapi-from-sources` (strict mode) to run the schema readiness checklist and write `schema/openapi.yaml` or a gap report.

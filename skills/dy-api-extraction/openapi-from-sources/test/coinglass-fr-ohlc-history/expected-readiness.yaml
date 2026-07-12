@@ -1,0 +1,34 @@
+# strict mode — schema gate must be NO-GO for coinglass fr-ohlc-histroy fixture
+gate: NO-GO
+strictness: strict
+dialect: OpenAPI 3.x
+fixture_root: fixture-input
+generation_test: true
+
+report_path: docs/openapi-readiness-report.md
+forbidden_outputs:
+  - schema/openapi.yaml
+
+must_contain_in_report:
+  - "Schema gate: **NO-GO**"
+  - "Strictness: strict"
+  - "Response 200 formal schema"
+  - "missing"
+  - "schema/openapi.yaml"
+  - "## User Decision Required"
+  - "1. **Re-fetch**"
+  - "2. **Example fallback**"
+  - "3. **Reduced scope**"
+  - "4. **Stop**"
+
+must_not_contain_in_report:
+  - "Schema gate: **GO**"
+
+fixture_input:
+  fr_ohlc_histroy: source/raw/fr-ohlc-histroy.md
+  api_source_report: docs/api-source-report.md
+
+fixture_markers:
+  fr_ohlc_histroy:
+    - "/api/futures/funding-rate/history"
+    - "fr-ohlc-histroy"
