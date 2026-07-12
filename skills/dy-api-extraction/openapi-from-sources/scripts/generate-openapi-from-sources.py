@@ -79,30 +79,86 @@ def media_type_example(body: dict) -> object | None:
     return None
 
 
-def schema_is_empty(schema: dict, body: dict | None = None) -> bool:
+def resolve_local_ref(spec: dict, ref: str) -> dict | None:
+    if not ref.startswith("#/"):
+        return None
+    node: object = spec
+    for part in ref[2:].split("/"):
+        if not isinstance(node, dict):
+            return None
+        node = node.get(part.replace("~1", "/").replace("~0", "~"))
+    return node if isinstance(node, dict) else None
+
+
+def resolve_ref_object(spec: dict, node: dict) -> dict:
+    ref = node.get("$ref")
+    if isinstance(ref, str):
+        target = resolve_local_ref(spec, ref)
+        if target is not None:
+            return target
+    return node
+
+
+def schema_is_empty(
+    schema: dict,
+    body: dict | None = None,
+    spec: dict | None = None,
+    seen_refs: set[str] | None = None,
+) -> bool:
     if schema.get("x-inferred-from"):
         return "type" not in schema and not any(
             schema.get(key) for key in ("$ref", "allOf", "oneOf", "anyOf", "properties", "items")
         )
-    if schema.get("$ref"):
-        return False
-    if any(schema.get(key) for key in ("allOf", "oneOf", "anyOf")):
+    ref = schema.get("$ref")
+    if ref:
+        if spec is None:
+            return False
+        if not isinstance(ref, str):
+            return True
+        if seen_refs is None:
+            seen_refs = set()
+        if ref in seen_refs:
+            return False
+        target = resolve_local_ref(spec, ref)
+        if target is None:
+            return True
+        return schema_is_empty(target, spec=spec, seen_refs=seen_refs | {ref})
+    composition_keys = ("allOf", "oneOf", "anyOf")
+    if any(key in schema for key in composition_keys):
+        for key in composition_keys:
+            if key in schema and not schema.get(key):
+                return True
+        return any(
+            not isinstance(sub, dict) or schema_is_empty(sub, spec=spec, seen_refs=seen_refs)
+            for key in composition_keys
+            for sub in (schema.get(key) or [])
+        )
+    if any(schema.get(key) for key in composition_keys):
         return False
     if not schema:
         return True
-    if schema.get("additionalProperties") is not None:
+    additional = schema.get("additionalProperties")
+    if additional is True:
+        return True
+    if isinstance(additional, dict):
+        return schema_is_empty(additional, spec=spec, seen_refs=seen_refs)
+    if additional is not None:
         return False
     props = schema.get("properties")
     if props:
         return any(
-            isinstance(prop_schema, dict) and schema_is_empty(prop_schema)
+            not isinstance(prop_schema, dict)
+            or schema_is_empty(prop_schema, spec=spec, seen_refs=seen_refs)
             for prop_schema in props.values()
         )
     schema_type = schema.get("type")
-    if schema_type == "array":
+    schema_types = schema_type if isinstance(schema_type, list) else [schema_type]
+    if "array" in schema_types:
         items = schema.get("items")
-        return not isinstance(items, dict) or schema_is_empty(items)
-    if schema_type and schema_type != "object":
+        return not isinstance(items, dict) or schema_is_empty(
+            items, spec=spec, seen_refs=seen_refs
+        )
+    if schema_type and "object" not in schema_types:
         return False
     return True
 
@@ -119,12 +175,14 @@ def find_empty_response_schemas(spec: dict) -> list[tuple[str, str, str]]:
     missing: list[tuple[str, str, str]] = []
     for path, _item, method, op in iter_operation_items(spec):
         for status, resp in (op.get("responses") or {}).items():
+            if isinstance(resp, dict):
+                resp = resolve_ref_object(spec, resp)
             content = resp.get("content") or {}
             if not content:
                 continue
             for _mime, body in content.items():
                 schema = body.get("schema") or {}
-                if schema_is_empty(schema, body):
+                if schema_is_empty(schema, body, spec=spec):
                     missing.append((path, method, status))
     seen: set[tuple[str, str, str]] = set()
     deduped: list[tuple[str, str, str]] = []
@@ -140,12 +198,34 @@ def iter_operations(spec: dict):
         yield path, method, op
 
 
+def resolve_parameter(spec: dict, param: dict) -> dict:
+    ref = param.get("$ref")
+    if isinstance(ref, str):
+        target = resolve_local_ref(spec, ref)
+        if target is not None:
+            return target
+    return param
+
+
+def effective_parameters(spec: dict, item: dict, op: dict) -> list[dict]:
+    merged: dict[tuple[str, str], dict] = {}
+    for param in item.get("parameters") or []:
+        if isinstance(param, dict):
+            param = resolve_parameter(spec, param)
+            merged[(str(param.get("name")), str(param.get("in")))] = param
+    for param in op.get("parameters") or []:
+        if isinstance(param, dict):
+            param = resolve_parameter(spec, param)
+            merged[(str(param.get("name")), str(param.get("in")))] = param
+    return list(merged.values())
+
+
 def find_schema_blockers(spec: dict) -> list[dict[str, str]]:
     blockers: list[dict[str, str]] = []
-    for path, _item, method, op in iter_operation_items(spec):
-        for param in op.get("parameters") or []:
+    for path, item, method, op in iter_operation_items(spec):
+        for param in effective_parameters(spec, item, op):
             schema = param.get("schema") or {}
-            if schema_is_empty(schema):
+            if schema_is_empty(schema, spec=spec):
                 name = param.get("name") or "unnamed"
                 blockers.append(
                     {
@@ -156,9 +236,11 @@ def find_schema_blockers(spec: dict) -> list[dict[str, str]]:
                     }
                 )
         request_body = op.get("requestBody") or {}
+        if isinstance(request_body, dict):
+            request_body = resolve_ref_object(spec, request_body)
         for body in (request_body.get("content") or {}).values():
             schema = body.get("schema") or {}
-            if schema_is_empty(schema):
+            if schema_is_empty(schema, spec=spec):
                 blockers.append(
                     {
                         "kind": "requestBody",
@@ -168,9 +250,11 @@ def find_schema_blockers(spec: dict) -> list[dict[str, str]]:
                     }
                 )
         for status, resp in (op.get("responses") or {}).items():
+            if isinstance(resp, dict):
+                resp = resolve_ref_object(spec, resp)
             for body in (resp.get("content") or {}).values():
                 schema = body.get("schema") or {}
-                if schema_is_empty(schema, body):
+                if schema_is_empty(schema, body, spec=spec):
                     blockers.append(
                         {
                             "kind": "response",
@@ -346,9 +430,11 @@ def apply_example_fallback(
     filled: set[str] = set()
     for _path, _method, op in iter_operations(spec):
         for status, resp in (op.get("responses") or {}).items():
+            if isinstance(resp, dict):
+                resp = resolve_ref_object(spec, resp)
             for body in (resp.get("content") or {}).values():
                 schema = body.get("schema") or {}
-                if not schema_is_empty(schema, body):
+                if not schema_is_empty(schema, body, spec=spec):
                     continue
                 example = media_type_example(body)
                 if example is None:
@@ -542,10 +628,18 @@ def build_report(
         )
     user_decision = ""
     if strictness == "strict" and schema_gate == "NO-GO":
-        gap_summary = ", ".join(f"{status}" for _, _, status in empty_responses) or "Response schema"
+        response_statuses = ", ".join(status for _, _, status in empty_responses)
+        gap_items: list[str] = []
+        if response_statuses:
+            gap_items.append(
+                f"formal schema missing for documented response(s): {response_statuses}"
+            )
+        gap_items.extend(report_schema_gaps)
+        gap_items.extend(blocker["element"] for blocker in schema_blockers)
+        gap_summary = "; ".join(gap_items) or "schema readiness"
         user_decision = f"""
 ## User Decision Required
-Schema gate **NO-GO** — blocking gap: formal schema missing for documented response(s): {gap_summary}.
+Schema gate **NO-GO** — blocking gap(s): {gap_summary}.
 
 Reply with one option number:
 
