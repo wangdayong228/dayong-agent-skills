@@ -13,19 +13,26 @@ Keep transport logic under `internal/transport/` so external consumers cannot im
 1. Timeout and context deadlines
 2. Authentication and default headers
 3. Typed error mapping for non-2xx responses
-4. Retry policy lookup by operation ID
+4. Retry policy lookup by policy operation key
 5. Optional request/response logging hooks
 
-## Operation ID Context Contract
+## Operation Key Context Contract
 
-`pkg/client` must attach operation ID before calling generated client methods:
+`pkg/client` must attach the **policy operation key** (not an ad-hoc label) before calling generated client methods. The key must match an entry in `<output>/sdk/retry-policy.yaml` `operations`:
+
+- Use OpenAPI `operationId` when present
+- Otherwise use the derived key from `references/retry-policy-schema.md` (`{UPPERCASE_METHOD}_{path_without_leading_slash_with_slashes_as_underscores}`, path template literals preserved)
 
 ```go
-ctx = transport.WithOperationID(ctx, "GetFundingRateHistory")
+// operationId present in spec:
+ctx = transport.WithOperationID(ctx, "getFundingRateHistory")
+
+// operationId absent; derived GET /api/v1/funding-rate/history:
+ctx = transport.WithOperationID(ctx, "GET_api_v1_funding-rate_history")
 resp, err := c.gen.GetFundingRateHistoryWithResponse(ctx, params)
 ```
 
-Transport reads this value to apply retry rules from `<output>/sdk/retry-policy.yaml`.
+Transport reads this key to apply retry rules from `<output>/sdk/retry-policy.yaml`.
 
 ## Typed Error Contract
 

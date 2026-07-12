@@ -38,6 +38,19 @@ This skill does not generate or repair OpenAPI specs. It consumes an existing tr
 
 This skill requires `api-client-generator` capability in the environment. If unavailable, stop with NO-GO and record the missing dependency in `.sdkgen/sdk-readiness-report.md`.
 
+### api-client-generator vs retry-policy boundary
+
+`api-client-generator` owns codegen patterns, transport seam design, and typed error mapping. It defers retry **backoff algorithms** to `rate-limit-handler`.
+
+This skill owns retry **policy** only:
+
+- Draft/review per-operation retry semantics in `.sdkgen/retry-policy.draft.yaml`
+- After user confirmation, write the finalized policy to `<output>/sdk/retry-policy.yaml`
+- Enforce policy gate before codegen
+- Wire transport retry lookup to confirmed policy keys
+
+Do not let `api-client-generator` override or bypass the retry-policy confirmation gate in this workflow.
+
 ## Input Requirements
 
 Accepted inputs:
@@ -85,7 +98,15 @@ Requirements:
 
 ### NO-GO Behavior (fail-fast)
 
-If SDK Gate is NO-GO, only write `.sdkgen/sdk-readiness-report.md` (and draft retry policy when available), then stop. Do not write SDK code outputs.
+**Preflight, dependency, or policy gate NO-GO** (before Phase A):
+
+- Write `.sdkgen/sdk-readiness-report.md` (and draft retry policy when available)
+- Stop before codegen; do not create `<output>/` SDK directories
+
+**Final SDK gate NO-GO** (after Phase A/B):
+
+- Write or update `.sdkgen/sdk-readiness-report.md` with blocking reasons
+- Stop before delivery; partial `<output>/` files may exist but are not a completed deliverable
 
 ## SDK Gate
 
@@ -106,14 +127,15 @@ Otherwise **NO-GO**.
 3. **Invoke api-client-generator guidance** and apply its constraints in subsequent generation/transport steps (mandatory dependency; do not run codegen before policy gate)
 4. **Draft retry policy**: write `.sdkgen/retry-policy.draft.yaml` per `references/retry-policy-schema.md`
 5. **User review**: batch table + `approve all` or explicit overrides
-6. **Policy gate**: if any operation is unconfirmed or `unreviewed`, NO-GO and stop before deliverable
-7. **Phase A (raw)**: generate `generated/client.gen.go` via `oapi-codegen`
-8. **Phase B (refined)**: implement `internal/transport/` and `pkg/client/`
-9. **Copy/normalize spec** into `<output>/schema/openapi.yaml`
-10. **Write spec manifest** at `<output>/sdk/spec-manifest.yaml` with spec path + SHA256 + generation timestamp
-11. **Write regen script** `<output>/scripts/regen.sh`
-12. **Final SDK gate**: validate structure checks + `go test ./...`; then decide GO/NO-GO
-13. **Deliver**: clean `<output>/`; keep `.sdkgen/` outside deliverable
+6. **Policy gate**: if any operation is unconfirmed or `unreviewed`, NO-GO and stop before codegen
+7. **Write confirmed retry policy** to `<output>/sdk/retry-policy.yaml` with every in-scope operation `confirmed: true` and no `unreviewed`
+8. **Phase A (raw)**: generate `generated/client.gen.go` via `oapi-codegen`
+9. **Phase B (refined)**: implement `internal/transport/` and `pkg/client/`
+10. **Copy/normalize spec** into `<output>/schema/openapi.yaml`
+11. **Write spec manifest** at `<output>/sdk/spec-manifest.yaml` with spec path + SHA256 + generation timestamp
+12. **Write regen script** `<output>/scripts/regen.sh`
+13. **Final SDK gate**: validate structure checks + `go test ./...`; then decide GO/NO-GO
+14. **Deliver (GO only)**: on GO, deliver clean `<output>/` and keep `.sdkgen/` outside deliverable; on NO-GO, write `.sdkgen/sdk-readiness-report.md` and stop without delivery
 
 ## Transport Rules
 
@@ -122,7 +144,7 @@ Use `http.RoundTripper` in `internal/transport/` for:
 - Timeout and context deadline handling
 - Auth and default headers
 - Non-2xx to typed errors (401/403, 404, 422, 429, 5xx)
-- Retry lookup by operation ID (`WithOperationID(ctx, opID)`)
+- Retry lookup by policy operation key (`WithOperationID(ctx, opKey)`), using the exact key from `<output>/sdk/retry-policy.yaml` `operations` map (OpenAPI `operationId` when present, otherwise derived per `references/retry-policy-schema.md`)
 
 Never patch generated files to add these policies.
 

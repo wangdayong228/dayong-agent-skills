@@ -14,6 +14,7 @@ This skill intentionally does not ship `test/` or `scripts/` helpers. Verificati
 - Collect user confirmation (`approve all` or explicit overrides)
 - Ensure no `policy: unreviewed`
 - Ensure all operations are `confirmed: true` before GO
+- After policy gate passes, confirm `<output>/sdk/retry-policy.yaml` is written before Phase A
 
 ## Output Verification (GO)
 
@@ -30,9 +31,17 @@ This skill intentionally does not ship `test/` or `scripts/` helpers. Verificati
 
 ## Output Verification (NO-GO)
 
+**Policy gate or preflight NO-GO** (before Phase A):
+
 - `.sdkgen/sdk-readiness-report.md` exists
 - optional `.sdkgen/retry-policy.draft.yaml` exists
-- no SDK code output directories are created
+- no `<output>/` SDK directories are created
+
+**Final SDK gate NO-GO** (after Phase A/B):
+
+- `.sdkgen/sdk-readiness-report.md` records blocking reasons
+- partial `<output>/` files may exist but delivery is not claimed
+- do not treat partial output as a completed SDK deliverable
 
 ## Recommended Report Sections
 

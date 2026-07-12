@@ -40,10 +40,10 @@ Example:
 
 ## Call Flow
 
-`pkg/client` method -> attach operation ID -> call generated method -> normalize response/error.
+`pkg/client` method -> attach policy operation key (`WithOperationID`) -> call generated method -> normalize response/error. The key must match `sdk/retry-policy.yaml` (OpenAPI `operationId` or derived key).
 
 ## Do NOT
 
 - Do NOT let call sites import `generated/` directly
 - Do NOT leak transport internals as public API
-- Do NOT bypass operation ID context in refined methods
+- Do NOT bypass policy operation key context in refined methods

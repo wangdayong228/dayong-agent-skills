@@ -23,7 +23,23 @@ operations:
 - Explicit idempotency header in parameters -> `idempotent_key_required` + header name
 - Missing evidence or unclear semantics -> `unreviewed`
 
-If `operationId` is absent, derive a stable ID from `method + path` and record that derivation in `.sdkgen/sdk-readiness-report.md`.
+If `operationId` is absent, derive a stable operation key:
+
+```text
+{UPPERCASE_METHOD}_{path_without_leading_slash_with_slashes_as_underscores}
+```
+
+Normalize the HTTP verb to uppercase when deriving from OpenAPI `paths` keys (e.g. `get` -> `GET`).
+
+Use the path template exactly as declared in the OpenAPI `paths` key, including `{param}` placeholders unchanged (e.g. `/users/{userId}` stays `/users/{userId}`, not a resolved value).
+
+Example: `GET` + `/api/v1/funding-rate/history` -> `GET_api_v1_funding-rate_history`
+
+Example with template: `GET` + `/users/{userId}` -> `GET_users_{userId}`
+
+Quote YAML map keys when the derived key contains characters YAML may parse specially (e.g. `{`, `}`, `:`).
+
+Record any derived keys in `.sdkgen/sdk-readiness-report.md`. Transport and `pkg/client` must use these exact keys with `WithOperationID`.
 
 ## Gate Rules
 
