@@ -59,6 +59,21 @@ class DraftRetryPolicyTest(unittest.TestCase):
         self.assertEqual(ops[upsert_id]["idempotency_header"], "Idempotency-Key")
         self.assertFalse(ops["GetRead"]["confirmed"])
 
+    def test_duplicate_operation_id_raises(self):
+        dup_spec = {
+            "openapi": "3.0.3",
+            "info": {"title": "t", "version": "1"},
+            "paths": {
+                "/a": {"get": {"operationId": "Dup", "responses": {"200": {"description": "ok"}}}},
+                "/b": {"get": {"operationId": "Dup", "responses": {"200": {"description": "ok"}}}},
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = Path(tmp) / "openapi.yaml"
+            spec.write_text(yaml.safe_dump(dup_spec), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                draft_retry_policy(str(spec))
+
 
 if __name__ == "__main__":
     unittest.main()

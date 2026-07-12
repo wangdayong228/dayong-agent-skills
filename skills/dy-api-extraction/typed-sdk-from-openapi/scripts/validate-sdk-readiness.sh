@@ -18,7 +18,7 @@ if [[ ! -f "$RUN_DIR/sdk/retry-policy.yaml" ]]; then
   exit 0
 fi
 
-"$PYTHON" - <<'PY' "$RUN_DIR/sdk/retry-policy.yaml"
+if ! "$PYTHON" - <<'PY' "$RUN_DIR/sdk/retry-policy.yaml"
 import sys
 import yaml
 from pathlib import Path
@@ -34,9 +34,13 @@ for op_id, entry in ops.items():
         sys.exit(3)
 print(f"operations={len(ops)}")
 PY
+then
+  echo "sdk_gate=NO-GO"
+  exit 0
+fi
 
 if [[ -n "$EXPECTED_POLICY" ]]; then
-  "$PYTHON" - <<'PY' "$RUN_DIR/sdk/retry-policy.yaml" "$EXPECTED_POLICY"
+  if ! "$PYTHON" - <<'PY' "$RUN_DIR/sdk/retry-policy.yaml" "$EXPECTED_POLICY"
 import sys
 import yaml
 from pathlib import Path
@@ -50,6 +54,10 @@ for op_id, exp in (expected.get("operations") or {}).items():
     if act.get("policy") != exp.get("policy"):
         raise SystemExit(f"policy mismatch {op_id}")
 PY
+  then
+    echo "sdk_gate=NO-GO"
+    exit 0
+  fi
 fi
 
 for path in \

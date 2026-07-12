@@ -62,6 +62,10 @@ def draft_retry_policy(openapi_path: str) -> dict[str, Any]:
             if not isinstance(operation, dict):
                 continue
             op_id = operation.get("operationId") or derive_operation_id(method, path)
+            if op_id in operations:
+                raise ValueError(
+                    f"duplicate operationId {op_id!r} for {method.upper()} {path}"
+                )
             policy, header, reason = _suggest_policy(method, operation)
             operations[op_id] = {
                 "method": method.upper(),
