@@ -1,4 +1,4 @@
 interface:
   display_name: "Iterative Code Review"
-  short_description: "Run bounded subagent review loops"
-  default_prompt: "Use $iterative-code-review to run a bounded subagent code review loop and fix verified issues."
+  short_description: "Parallel main-agent + context-packed review loop"
+  default_prompt: "Use $iterative-code-review to run a bounded parallel review loop with context-packed subagents and fix verified issues."
