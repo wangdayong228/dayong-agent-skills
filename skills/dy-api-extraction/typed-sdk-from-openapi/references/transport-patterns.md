@@ -8,20 +8,22 @@
 
 Keep transport logic under `internal/transport/` so external consumers cannot import it directly. Public consumers should only use `pkg/client`.
 
-## Required Capabilities
+## Required Capabilities (RoundTripper)
 
 1. Timeout and context deadlines
 2. Authentication and default headers
-3. Typed error mapping for non-2xx responses
-4. Retry policy lookup by policy operation key
+3. Retry policy lookup by policy operation key
+4. Backoff execution via `rate-limit-handler` when policy allows retry
 5. Optional request/response logging hooks
+
+Do **not** map HTTP status codes to typed errors inside `RoundTripper`. The `net/http` contract requires returning `err == nil` when a response is obtained.
 
 ## Operation Key Context Contract
 
 `pkg/client` must attach the **policy operation key** (not an ad-hoc label) before calling generated client methods. The key must match an entry in `<output>/sdk/retry-policy.yaml` `operations`:
 
 - Use OpenAPI `operationId` when present
-- Otherwise use the derived key from `references/retry-policy-schema.md` (`{UPPERCASE_METHOD}_{path_without_leading_slash_with_slashes_as_underscores}`, path template literals preserved)
+- Otherwise use the derived key from `references/retry-policy-schema.md` (collision-safe `{UPPERCASE_METHOD}_{escaped_path}`)
 
 ```go
 // operationId present in spec:
@@ -34,9 +36,9 @@ resp, err := c.gen.GetFundingRateHistoryWithResponse(ctx, params)
 
 Transport reads this key to apply retry rules from `<output>/sdk/retry-policy.yaml`.
 
-## Typed Error Contract
+## Response Normalization (pkg/client)
 
-Map HTTP failures to typed categories:
+Map HTTP failures to typed categories **after** the generated call returns:
 
 - `AuthError` for 401/403
 - `NotFoundError` for 404
@@ -53,6 +55,8 @@ Retry only when policy allows and error/status is transient:
 - statuses: `429`, `502`, `503`, `504`
 - transient network errors
 
+Backoff timing (exponential backoff, jitter, Retry-After) comes from `rate-limit-handler`, not ad-hoc logic in this skill.
+
 Write methods default to `non_retryable` unless user-confirmed override.
 
 ## Injection Pattern
@@ -64,3 +68,4 @@ Generated client must receive a custom `http.Client` configured with the transpo
 - Do NOT hand-edit `generated/`
 - Do NOT scatter auth/header logic in endpoint methods
 - Do NOT hardcode retry decisions in generated methods
+- Do NOT convert non-2xx HTTP responses into errors inside `RoundTripper`

@@ -38,6 +38,8 @@ This skill does not generate or repair OpenAPI specs. It consumes an existing tr
 
 This skill requires `api-client-generator` capability in the environment. If unavailable, stop with NO-GO and record the missing dependency in `.sdkgen/sdk-readiness-report.md`.
 
+When any confirmed operation uses `retryable` or `idempotent_key_required`, also require `rate-limit-handler` capability (backoff/jitter/Retry-After). If missing, stop with NO-GO before Phase B.
+
 ### api-client-generator vs retry-policy boundary
 
 `api-client-generator` owns codegen patterns, transport seam design, and typed error mapping. It defers retry **backoff algorithms** to `rate-limit-handler`.
@@ -114,6 +116,8 @@ Requirements:
 
 - Retry policy is confirmed by user for all in-scope operations
 - No `policy: unreviewed`
+- All derived operation keys are unique (no collisions)
+- When any operation is `retryable` or `idempotent_key_required`, `rate-limit-handler` capability is available
 - Final output module structure is complete
 - `<output>/sdk/spec-manifest.yaml` records spec SHA256 provenance
 - `go test ./...` passes in `<output>/`
@@ -127,7 +131,7 @@ Otherwise **NO-GO**.
 3. **Invoke api-client-generator guidance** and apply its constraints in subsequent generation/transport steps (mandatory dependency; do not run codegen before policy gate)
 4. **Draft retry policy**: write `.sdkgen/retry-policy.draft.yaml` per `references/retry-policy-schema.md`
 5. **User review**: batch table + `approve all` or explicit overrides
-6. **Policy gate**: if any operation is unconfirmed or `unreviewed`, NO-GO and stop before codegen
+6. **Policy gate**: if any operation is unconfirmed or `unreviewed`, NO-GO and stop before codegen; if any confirmed operation is `retryable` or `idempotent_key_required`, confirm `rate-limit-handler` capability is available (backoff for `internal/transport/retry.go`), otherwise NO-GO
 7. **Write confirmed retry policy** to `<output>/sdk/retry-policy.yaml` with every in-scope operation `confirmed: true` and no `unreviewed`
 8. **Phase A (raw)**: generate `generated/client.gen.go` via `oapi-codegen`
 9. **Phase B (refined)**: implement `internal/transport/` and `pkg/client/`
@@ -143,8 +147,12 @@ Use `http.RoundTripper` in `internal/transport/` for:
 
 - Timeout and context deadline handling
 - Auth and default headers
-- Non-2xx to typed errors (401/403, 404, 422, 429, 5xx)
 - Retry lookup by policy operation key (`WithOperationID(ctx, opKey)`), using the exact key from `<output>/sdk/retry-policy.yaml` `operations` map (OpenAPI `operationId` when present, otherwise derived per `references/retry-policy-schema.md`)
+- Backoff execution via `rate-limit-handler` when policy allows retry
+
+`RoundTripper` must follow the `net/http` contract: return `err == nil` when a response is obtained, regardless of HTTP status.
+
+Normalize non-2xx HTTP responses to typed errors (401/403, 404, 422, 429, 5xx) in `pkg/client/` after the generated call returns the response — not inside `RoundTripper`.
 
 Never patch generated files to add these policies.
 

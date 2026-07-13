@@ -40,7 +40,7 @@ Example:
 
 ## Call Flow
 
-`pkg/client` method -> attach policy operation key (`WithOperationID`) -> call generated method -> normalize response/error. The key must match `sdk/retry-policy.yaml` (OpenAPI `operationId` or derived key).
+`pkg/client` method -> attach policy operation key (`WithOperationID`) -> call generated method -> **normalize HTTP status/body to typed errors** (not in RoundTripper) -> return domain result.
 
 ## Do NOT
 

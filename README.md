@@ -16,7 +16,7 @@
 | `iterative-code-review` | 要求子代理/AI reviewer 审查本地改动，并由主代理循环修复直至通过 |
 | `strict-api-extraction` | 从官方 API 文档站完整采集原始素材（`source/raw` + `source/snapshots`）并产出 `api-source-report.md`；coverage 不足时继续抓取，禁止猜测未文档化的 schema 元素。**依赖：** 需单独安装 `ego-browser`；可选 `firecrawl-scrape` / `firecrawl-map` |
 | `openapi-from-sources` | 基于已有素材（含 strict-api-extraction 产出）校验是否足够生成 OpenAPI 3.x；strict NO-GO 时报告 4 个编号选项，用户选 example-fallback 后可从官方 example 生成带标注的 `schema/openapi.yaml`。**依赖：** 素材需已采集；下游可用 `api-client-generator` 或 `typed-sdk-from-openapi`（Go） |
-| `typed-sdk-from-openapi` | 输入任意可信且 pinned 的 OpenAPI 3.x 文档，先通过 preflight + 依赖检查，加载 `api-client-generator` 约束后先完成 retry policy 草案/审阅/确认 gate，再进入 Phase A/B 生成与封装，最终产出 2 层 Go SDK（`generated/` + `pkg/client/`，`internal/transport/` 作为内部实现）；中间产物落到 `.sdkgen/`，NO-GO fail-fast 仅输出报告。 |
+| `typed-sdk-from-openapi` | 输入任意可信且 pinned 的 OpenAPI 3.x 文档，先通过 preflight + 依赖检查，加载 `api-client-generator` 约束后先完成 retry policy 草案/审阅/确认 gate，再进入 Phase A/B 生成与封装，最终产出 2 层 Go SDK（`generated/` + `pkg/client/`，`internal/transport/` 作为内部实现）；中间产物落到 `.sdkgen/`，NO-GO fail-fast 仅输出报告。**依赖：** `api-client-generator`；若存在 `retryable` 操作还需 `rate-limit-handler` |
 
 例外：若你明确要求 `diff-only review`，则只审查 diff，不会按 `affected-path-review` 扩展到完整行为路径。
 
@@ -58,6 +58,7 @@ npx skills add wangdayong228/dayong-agent-skills --skill openapi-from-sources -g
 npx skills add wangdayong228/dayong-agent-skills --skill typed-sdk-from-openapi -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
+# 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
 ```
 
 **安装单个 skill（`@` 简写）：**
@@ -71,6 +72,7 @@ npx skills add wangdayong228/dayong-agent-skills@openapi-from-sources -g -y
 npx skills add wangdayong228/dayong-agent-skills@typed-sdk-from-openapi -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
+# 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
 ```
 
 ## 更新

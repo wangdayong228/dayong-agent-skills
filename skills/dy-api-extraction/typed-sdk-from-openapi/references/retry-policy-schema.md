@@ -23,19 +23,28 @@ operations:
 - Explicit idempotency header in parameters -> `idempotent_key_required` + header name
 - Missing evidence or unclear semantics -> `unreviewed`
 
-If `operationId` is absent, derive a stable operation key:
+If `operationId` is absent, derive a collision-safe operation key:
 
 ```text
-{UPPERCASE_METHOD}_{path_without_leading_slash_with_slashes_as_underscores}
+{UPPERCASE_METHOD}_{escaped_path}
 ```
+
+Escaping rules (apply in order to the path template without its leading slash):
+
+1. Replace each literal `_` with `__`
+2. Replace each `/` with `_`
 
 Normalize the HTTP verb to uppercase when deriving from OpenAPI `paths` keys (e.g. `get` -> `GET`).
 
-Use the path template exactly as declared in the OpenAPI `paths` key, including `{param}` placeholders unchanged (e.g. `/users/{userId}` stays `/users/{userId}`, not a resolved value).
+Use the path template exactly as declared in the OpenAPI `paths` key, including `{param}` placeholders unchanged.
 
 Example: `GET` + `/api/v1/funding-rate/history` -> `GET_api_v1_funding-rate_history`
 
+Example (collision avoided): `GET` + `/foo/bar` -> `GET_foo_bar`; `GET` + `/foo_bar` -> `GET_foo__bar`
+
 Example with template: `GET` + `/users/{userId}` -> `GET_users_{userId}`
+
+After deriving all keys, detect duplicates. Any collision is **NO-GO** — record colliding method/path pairs in `.sdkgen/sdk-readiness-report.md` and require explicit `operationId` overrides before GO.
 
 Quote YAML map keys when the derived key contains characters YAML may parse specially (e.g. `{`, `}`, `:`).
 
@@ -48,6 +57,7 @@ SDK Gate can be GO only when:
 - every in-scope operation appears in `operations`
 - every operation has `confirmed: true`
 - no operation has `policy: unreviewed`
+- all derived operation keys are unique (no collisions)
 
 Any violation is NO-GO fail-fast.
 

@@ -14,6 +14,8 @@ This skill intentionally does not ship `test/` or `scripts/` helpers. Verificati
 - Collect user confirmation (`approve all` or explicit overrides)
 - Ensure no `policy: unreviewed`
 - Ensure all operations are `confirmed: true` before GO
+- Detect derived operation key collisions; collision is NO-GO
+- If any operation is `retryable` or `idempotent_key_required`, confirm `rate-limit-handler` capability before Phase B
 - After policy gate passes, confirm `<output>/sdk/retry-policy.yaml` is written before Phase A
 
 ## Output Verification (GO)
