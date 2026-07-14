@@ -1,0 +1,4 @@
+interface:
+  display_name: "Typed SDK From OpenAPI"
+  short_description: "Generate Go typed SDK from pinned OpenAPI with confirmed retry policy."
+  default_prompt: "Use typed-sdk-from-openapi on schema/openapi.yaml: draft retry-policy, request user batch confirmation, then generate oapi-codegen raw SDK, transport retry layer, and refined pkg/client."

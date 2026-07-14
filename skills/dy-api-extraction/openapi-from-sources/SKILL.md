@@ -1,6 +1,6 @@
 ---
 name: openapi-from-sources
-description: Assembles OpenAPI 3.x from existing source materials (strict-api-extraction output, markdown, partial openapi.json). Runs strict readiness first; on NO-GO presents four numbered user options including example-fallback when official schema is incomplete. Do NOT fetch docs — use strict-api-extraction upstream. Do NOT codegen clients — use api-client-generator downstream.
+description: Assembles OpenAPI 3.x from existing source materials (strict-api-extraction output, markdown, partial openapi.json). Runs strict readiness first; on NO-GO presents four numbered user options including example-fallback when official schema is incomplete. Do NOT fetch docs — use strict-api-extraction upstream. Do NOT codegen clients — use typed-sdk-from-openapi downstream.
 ---
 
 # OpenAPI From Sources
@@ -15,7 +15,7 @@ Assemble OpenAPI 3.x **only from evidenced source text** (Tier A/B). Never guess
 
 **Use:** materials already collected; user asks to generate or reconstruct `openapi.yaml`; validating whether sources are ready for schema work.
 
-**NOT:** need to crawl docs → `strict-api-extraction`; complete trusted spec already pinned → use as-is; client codegen → `api-client-generator`; JSON-RPC → out of scope for v1.
+**NOT:** need to crawl docs → `strict-api-extraction`; complete trusted spec already pinned → use as-is; Go client codegen → `typed-sdk-from-openapi`; JSON-RPC → out of scope for v1.
 
 ## Scope Boundary
 
@@ -133,7 +133,7 @@ Forbidden without Tier A/B text: infer types from examples; invent enums; assume
 | **GO (reduced-scope)** | `schema/openapi.yaml` for reduced scope only, `docs/openapi-readiness-report.md` with `out_of_scope` rows |
 | **NO-GO** | `docs/openapi-readiness-report.md` only — gaps + the four numbered user options; do not delete an existing `schema/openapi.yaml` from a prior run |
 
-After **GO**, suggest `api-client-generator` for client work.
+After **GO**, suggest `typed-sdk-from-openapi` for Go typed SDK work in this pipeline (transport principles align with `api-client-generator`).
 
 ## Runtime Validation
 
