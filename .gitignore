@@ -1,6 +1,9 @@
 # skill test fixtures and local verification runs
 **/test/
 
+# local design/plan docs (superpowers workflow); keep untracked
+docs/superpowers/
+
 # strict-api-extraction runtime outputs (agents should add these to target project .gitignore too)
 .firecrawl/
 .local/
