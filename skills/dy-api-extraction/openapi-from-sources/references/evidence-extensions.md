@@ -12,7 +12,7 @@ paths:
     get:
       operationId: example
       x-source-evidence:
-        - file: source/raw/example.md
+        - file: pipeline/extract/raw/example.md
           line: "73-77"
       parameters:
         - name: exchange
@@ -21,14 +21,14 @@ paths:
           schema:
             type: string
           x-source-evidence:
-            - file: source/raw/example.md
+            - file: pipeline/extract/raw/example.md
               line: "80-87"
 ```
 
 Rules:
 - `file` is repo-relative from material root
 - `line` is a single line or inclusive range (`117` or `80-87`)
-- Tier C paths (`docs/api-source-report.md`) are forbidden as sole evidence
+- Tier C paths (`pipeline/extract/report.md`) are forbidden as sole evidence
 
 ## x-readiness (document-level, optional)
 
@@ -55,7 +55,7 @@ properties:
   code:
     type: string
     x-source-evidence:
-      - file: source/raw/example.md
+      - file: pipeline/extract/raw/example.md
         line: "20-41"
     x-inferred-from: example
 ```

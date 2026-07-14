@@ -25,14 +25,14 @@ Deliver **source artifacts** (Tier A/B) plus one **derived** report (Tier C). Sc
 
 | Tier | Location | What | Cite as evidence? | Conflict rank |
 | --- | --- | --- | --- | --- |
-| A raw | `source/raw/` | HTTP bytes from docs domain (openapi.json, openrpc.json, llms.txt) | Yes | 1 |
-| B snapshots | `source/snapshots/` | ego-browser page captures (snapshotText) | Yes | 2 |
+| A raw | `pipeline/extract/raw/` | HTTP bytes from docs domain (openapi.json, openrpc.json, llms.txt) | Yes | 1 |
+| B snapshots | `pipeline/extract/snapshots/` | ego-browser page captures (snapshotText) | Yes | 2 |
 | B snapshots | `.firecrawl/` | Firecrawl fallback captures (keep default filenames) | Yes | 3 |
-| C derived | `docs/api-source-report.md` | Agent-written index | No | — |
+| C derived | `pipeline/extract/report.md` | Agent-written index | No | — |
 
-No `schema-evidence` or `corpus` folders. Add `.local/`, `.firecrawl/`, `source/raw/`, and `source/snapshots/` to the **target project** `.gitignore`. Never commit scraped third-party documentation into user projects. (Maintainer test fixtures in skill repos are optional and follow that repo's `.gitignore`.)
+No `schema-evidence` or `corpus` folders. Add `.local/`, `.firecrawl/`, and `pipeline/extract/raw/` to the **target project** `.gitignore`. Never commit scraped third-party documentation into user projects. (Maintainer test fixtures in skill repos are optional and follow that repo's `.gitignore`.)
 
-Schema fields must trace to Tier A or B with `path:line` (`source/raw/`, `source/snapshots/`, or `.firecrawl/`). The report is never sole evidence.
+Schema fields must trace to Tier A or B with `path:line` (`pipeline/extract/raw/`, `pipeline/extract/snapshots/`, or `.firecrawl/`). The report is never sole evidence.
 
 **Snapshot frontmatter** (Tier A raw records `page_type` in report Source Index only):
 
@@ -66,10 +66,10 @@ Classify each URL, pick first-try tool, record `page_type`. Two failed attempts 
 
 | `page_type` | First try | Tier | Fallback |
 | --- | --- | --- | --- |
-| `machine-spec` | `serverFetch` (`.json`, `.yaml`, `.md`, `llms.txt`) | A → `source/raw/` | `browserFetch`; store only if valid JSON/YAML/text — otherwise mark URL `unreachable` and note in report |
-| `static-html` | `serverFetch` or `snapshotText` | B → `source/snapshots/` | firecrawl-scrape → `.firecrawl/` |
-| `spa` | `openOrReuseTab` + wait + `snapshotText` | B → `source/snapshots/` | firecrawl-scrape → `.firecrawl/` |
-| `interactive` | expand tabs/accordions/pagination, then `snapshotText` | B → `source/snapshots/` | firecrawl-scrape → `.firecrawl/` |
+| `machine-spec` | `serverFetch` (`.json`, `.yaml`, `.md`, `llms.txt`) | A → `pipeline/extract/raw/` | `browserFetch`; store only if valid JSON/YAML/text — otherwise mark URL `unreachable` and note in report |
+| `static-html` | `serverFetch` or `snapshotText` | B → `pipeline/extract/snapshots/` | firecrawl-scrape → `.firecrawl/` |
+| `spa` | `openOrReuseTab` + wait + `snapshotText` | B → `pipeline/extract/snapshots/` | firecrawl-scrape → `.firecrawl/` |
+| `interactive` | expand tabs/accordions/pagination, then `snapshotText` | B → `pipeline/extract/snapshots/` | firecrawl-scrape → `.firecrawl/` |
 | `auth-gated` | ego-browser with user session | B | `unreachable` (login required) |
 
 Firecrawl is auxiliary only — bulk URL map (`firecrawl-map`) and Tier B fallback, never the sole fetch path.
@@ -83,17 +83,17 @@ Stop when every checklist item has a terminal status (`sourced`, `missing_from_d
 ## Workflow
 
 1. **Dialect & scope** — REST → OpenAPI 3.x; JSON-RPC → OpenRPC 1.x. Record in-scope endpoints/APIs in report Summary `Scope` (from user request; if unclear, ask before discovery).
-2. **Probe Tier A** — per dialect, `serverFetch` → `source/raw/`:
+2. **Probe Tier A** — per dialect, `serverFetch` → `pipeline/extract/raw/`:
    - OpenAPI: `/openapi.json`, `/swagger.json`, `/llms.txt`
    - OpenRPC: `/openrpc.json`, `/llms.txt`
    **Pin and short-circuit discovery** (skip steps 3–6 page fetch loop) only when a **complete, trusted** spec is confirmed (see below). **Always** run step 5 Coverage against the pinned spec, then step 7. If step 5 finds in-scope checklist gaps that require documentation **outside** the pinned spec, **resume discovery** (steps 3–6; round counter continues, does not reset) — do not mark `missing_from_docs` without exhaustive search. Gate **GO** only per Deliverable below.
 3. **Discovery** — ego-browser entry URL; walk sidebar, index, version switcher, cross-links; classify URLs (Page Scope); optional `firecrawl-map`
-4. **Fetch** — per Capture by Page Type → `source/raw/` or `source/snapshots/` (ego-browser); Firecrawl fallback → `.firecrawl/` (still Tier B). Expand hidden content; chase cross-refs into frontier
+4. **Fetch** — per Capture by Page Type → `pipeline/extract/raw/` or `pipeline/extract/snapshots/` (ego-browser); Firecrawl fallback → `.firecrawl/` (still Tier B). Expand hidden content; chase cross-refs into frontier
 5. **Coverage** — each checklist item: `sourced` (`path:line`), `missing_from_docs`, `unreachable`, `N/A` (not applicable, e.g. GET has no body), or `out_of_scope` (user-approved reduced scope); flag pending cross-ref URLs as `unresolved_ref`
 6. **Loop** — items lacking a terminal status (`sourced`, `missing_from_docs`, `unreachable`, `N/A`, `out_of_scope`), pending cross-ref `unresolved_ref`, or frontier URLs → step 3 if `round < 5`; at `round >= 5`, reclassify per Loop Contract then proceed to step 7; two fetch failures → `unreachable`; any `round_limit_deferred` → **NO-GO** unless user explicitly approves reduced scope (update Summary `Scope`, mark affected checklist items `out_of_scope`, keep deferred URLs in Unresolved Items)
-7. **Report** — write `docs/api-source-report.md` per `references/report-template.md`
+7. **Report** — write `pipeline/extract/report.md` per `references/report-template.md`
 
-**Complete, trusted spec (step 2 short-circuit criteria):** all must pass before skipping discovery — (1) parses as valid OpenAPI 3.x or OpenRPC 1.x; (2) covers the in-scope endpoints/operations or RPC methods (cross-check `llms.txt` or docs index when available); (3) not obviously partial (empty `paths`/`methods`, single operation when docs list many, version mismatch); (4) user has not flagged it stale/unverified. Any doubt → treat as incomplete and continue discovery. Short-circuit still requires step 7 report — never finish without `docs/api-source-report.md`.
+**Complete, trusted spec (step 2 short-circuit criteria):** all must pass before skipping discovery — (1) parses as valid OpenAPI 3.x or OpenRPC 1.x; (2) covers the in-scope endpoints/operations or RPC methods (cross-check `llms.txt` or docs index when available); (3) not obviously partial (empty `paths`/`methods`, single operation when docs list many, version mismatch); (4) user has not flagged it stale/unverified. Any doubt → treat as incomplete and continue discovery. Short-circuit still requires step 7 report — never finish without `pipeline/extract/report.md`.
 
 ## Page Scope
 
@@ -125,17 +125,17 @@ Forbidden without Tier A/B text: infer types from examples; invent enums; assume
 | Excuse → Reality |
 | --- |
 | "Firecrawl is faster" → ego-browser primary; Firecrawl fallback only |
-| "Report says sourced" → Tier C is not evidence; need Tier A/B `path:line` (`source/raw/`, `source/snapshots/`, or `.firecrawl/`) |
+| "Report says sourced" → Tier C is not evidence; need Tier A/B `path:line` (`pipeline/extract/raw/`, `pipeline/extract/snapshots/`, or `.firecrawl/`) |
 | "Example shows string" → examples ≠ schema |
 | "Live API confirms field" → guessing unless user approved |
 
-**STOP:** citing report alone; Firecrawl-only when ego-browser available; writing openapi.yaml before **GO**; stopping with unexplored sidebar/cross-refs; open `unresolved_ref` marked complete; finishing without `docs/api-source-report.md`.
+**STOP:** citing report alone; Firecrawl-only when ego-browser available; writing openapi.yaml before **GO**; stopping with unexplored sidebar/cross-refs; open `unresolved_ref` marked complete; finishing without `pipeline/extract/report.md`.
 
 Do not substitute memory, training data, or third-party specs for missing sources.
 
 ## Deliverable
 
-Write **`docs/api-source-report.md`** (Tier C) using `references/report-template.md`.
+Write **`pipeline/extract/report.md`** (Tier C) using `references/report-template.md`.
 
 **GO** = every in-scope item has a terminal collection status — `sourced` from Tier A/B, `N/A`, user-approved `out_of_scope`, or `missing_from_docs` after exhaustive search; no pending cross-ref `unresolved_ref`; no `round_limit_deferred` unless user approved reduced scope (Scope updated, deferred items `out_of_scope`). **Evidence conflicts** (Tier A vs B disagree): cite the **winning tier** (rank 1 > 2 > 3) in Coverage Report `path:line`, and record the conflict in Unresolved Items with both ranks — conflicts do not block extraction **GO**.  
 **NO-GO** = any in-scope item lacks a terminal status; any required in-scope element is `unreachable`; or any `round_limit_deferred` without user-approved reduced scope.

@@ -7,7 +7,7 @@ description: Use when a trusted pinned OpenAPI 3.x spec exists and a clean two-l
 
 ## Core Rule
 
-Input is a trusted pinned OpenAPI 3.x spec from any source. Run preflight gate and dependency check first, then load/apply `api-client-generator` guidance (without running codegen yet), complete retry policy draft/review/confirmation gate, and only then produce the clean two-layer Go SDK module: `generated/` (raw) + `pkg/client/` (refined API).
+Input is a trusted pinned OpenAPI 3.x spec from any source. Prefer `pipeline/openapi/openapi.yaml`; an explicit user-pinned OpenAPI 3.x path is also valid. Run preflight gate and dependency check first, then load/apply `api-client-generator` guidance (without running codegen yet), complete retry policy draft/review/confirmation gate, and only then produce the clean two-layer Go SDK module: `internal/generated/` (raw) + `pkg/client/` (refined API).
 
 `internal/transport/` is part of the refined layer implementation and must stay internal.
 
@@ -17,7 +17,7 @@ Input is a trusted pinned OpenAPI 3.x spec from any source. Run preflight gate a
 
 **Use:**
 
-- User already has a trusted pinned OpenAPI 3.x file (`openapi.yaml|json`, `schema/openapi.yaml|json`)
+- User already has a trusted pinned OpenAPI 3.x file (prefer `pipeline/openapi/openapi.yaml`; explicit pinned path accepted)
 - Target output is a Go SDK with raw + refined layers
 - User wants deterministic retry policy review before SDK delivery
 
@@ -47,7 +47,7 @@ When any confirmed operation uses `retryable` or `idempotent_key_required`, also
 This skill owns retry **policy** only:
 
 - Draft/review per-operation retry semantics in `.sdkgen/retry-policy.draft.yaml`
-- After user confirmation, write the finalized policy to `<output>/sdk/retry-policy.yaml`
+- After user confirmation, write the finalized policy to `<output>/config/retry-policy.yaml`
 - Enforce policy gate before codegen
 - Wire transport retry lookup to confirmed policy keys
 
@@ -58,10 +58,8 @@ Do not let `api-client-generator` override or bypass the retry-policy confirmati
 Accepted inputs:
 
 ```text
-schema/openapi.yaml
-schema/openapi.json
-openapi.yaml
-openapi.json
+pipeline/openapi/openapi.yaml
+<explicit-user-pinned-openapi-3.x-path>
 ```
 
 Requirements:
@@ -76,13 +74,13 @@ Requirements:
 
 ```text
 <output>/
-  schema/openapi.yaml
-  generated/client.gen.go
+  internal/generated/client.gen.go
   internal/transport/{transport.go,errors.go,operation.go,retry.go}
   pkg/client/client.go
-  sdk/spec-manifest.yaml
-  sdk/retry-policy.yaml
-  scripts/regen.sh
+  config/spec-manifest.yaml
+  config/retry-policy.yaml
+  tools/regen.sh
+  tools/oapi-codegen.yaml
   go.mod
   go.sum (optional)
 ```
@@ -119,7 +117,7 @@ Requirements:
 - All derived operation keys are unique (no collisions)
 - When any operation is `retryable` or `idempotent_key_required`, `rate-limit-handler` capability is available
 - Final output module structure is complete
-- `<output>/sdk/spec-manifest.yaml` records spec SHA256 provenance
+- `<output>/config/spec-manifest.yaml` records input spec path, SHA256 provenance, and generation timestamp
 - `go test ./...` passes in `<output>/`
 
 Otherwise **NO-GO**.
@@ -132,14 +130,13 @@ Otherwise **NO-GO**.
 4. **Draft retry policy**: write `.sdkgen/retry-policy.draft.yaml` per `references/retry-policy-schema.md`
 5. **User review**: batch table + `approve all` or explicit overrides
 6. **Policy gate**: if any operation is unconfirmed or `unreviewed`, NO-GO and stop before codegen; if any confirmed operation is `retryable` or `idempotent_key_required`, confirm `rate-limit-handler` capability is available (backoff for `internal/transport/retry.go`), otherwise NO-GO
-7. **Write confirmed retry policy** to `<output>/sdk/retry-policy.yaml` with every in-scope operation `confirmed: true` and no `unreviewed`
-8. **Phase A (raw)**: generate `generated/client.gen.go` via `oapi-codegen`
+7. **Write confirmed retry policy** to `<output>/config/retry-policy.yaml` with every in-scope operation `confirmed: true` and no `unreviewed`
+8. **Phase A (raw)**: generate `internal/generated/client.gen.go` via `oapi-codegen`
 9. **Phase B (refined)**: implement `internal/transport/` and `pkg/client/`
-10. **Copy/normalize spec** into `<output>/schema/openapi.yaml`
-11. **Write spec manifest** at `<output>/sdk/spec-manifest.yaml` with spec path + SHA256 + generation timestamp
-12. **Write regen script** `<output>/scripts/regen.sh`
-13. **Final SDK gate**: validate structure checks + `go test ./...`; then decide GO/NO-GO
-14. **Deliver (GO only)**: on GO, deliver clean `<output>/` and keep `.sdkgen/` outside deliverable; on NO-GO, write `.sdkgen/sdk-readiness-report.md` and stop without delivery
+10. **Write spec manifest** at `<output>/config/spec-manifest.yaml` with input spec path + SHA256 + generation timestamp
+11. **Write codegen config and regen script** at `<output>/tools/oapi-codegen.yaml` and `<output>/tools/regen.sh` — both must read the **input** OpenAPI from `config/spec-manifest.yaml` `input_spec_path` (typically `pipeline/openapi/openapi.yaml` or the user-pinned path). Do **not** assume or recreate a deliverable `schema/openapi.yaml`
+12. **Final SDK gate**: validate structure checks + `go test ./...`; then decide GO/NO-GO
+13. **Deliver (GO only)**: on GO, deliver clean `<output>/` and keep `.sdkgen/` outside deliverable; on NO-GO, write `.sdkgen/sdk-readiness-report.md` and stop without delivery
 
 ## Transport Rules
 
@@ -147,7 +144,7 @@ Use `http.RoundTripper` in `internal/transport/` for:
 
 - Timeout and context deadline handling
 - Auth and default headers
-- Retry lookup by policy operation key (`WithOperationID(ctx, opKey)`), using the exact key from `<output>/sdk/retry-policy.yaml` `operations` map (OpenAPI `operationId` when present, otherwise derived per `references/retry-policy-schema.md`)
+- Retry lookup by policy operation key (`WithOperationID(ctx, opKey)`), using the exact key from `<output>/config/retry-policy.yaml` `operations` map (OpenAPI `operationId` when present, otherwise derived per `references/retry-policy-schema.md`)
 - Backoff execution via `rate-limit-handler` when policy allows retry
 
 `RoundTripper` must follow the `net/http` contract: return `err == nil` when a response is obtained, regardless of HTTP status.
@@ -168,12 +165,12 @@ Never patch generated files to add these policies.
 
 Before claiming completion:
 
-- `<output>/schema/openapi.yaml` exists
-- `<output>/generated/client.gen.go` exists and is generated-only
+- Input spec path is recorded in `<output>/config/spec-manifest.yaml`; no deliverable spec copy is required
+- `<output>/internal/generated/client.gen.go` exists and is generated-only
 - `<output>/internal/transport/` and `<output>/pkg/client/` exist and compile
-- `<output>/sdk/spec-manifest.yaml` exists and includes OpenAPI SHA256 provenance
-- `<output>/sdk/retry-policy.yaml` has confirmed operations and no `unreviewed`
-- `<output>/scripts/regen.sh` reproduces generated layer
+- `<output>/config/spec-manifest.yaml` exists and includes input OpenAPI path, SHA256 provenance, and generation timestamp
+- `<output>/config/retry-policy.yaml` has confirmed operations and no `unreviewed`
+- `<output>/tools/regen.sh` reproduces generated layer using `<output>/tools/oapi-codegen.yaml`
 - `<output>/go test ./...` passes
 - Final output excludes `.sdkgen/` intermediates
 

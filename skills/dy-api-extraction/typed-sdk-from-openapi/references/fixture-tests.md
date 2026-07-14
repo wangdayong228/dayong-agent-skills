@@ -16,17 +16,17 @@ This skill intentionally does not ship `test/` or `scripts/` helpers. Verificati
 - Ensure all operations are `confirmed: true` before GO
 - Detect derived operation key collisions; collision is NO-GO
 - If any operation is `retryable` or `idempotent_key_required`, confirm `rate-limit-handler` capability before Phase B
-- After policy gate passes, confirm `<output>/sdk/retry-policy.yaml` is written before Phase A
+- After policy gate passes, confirm `<output>/config/retry-policy.yaml` is written before Phase A
 
 ## Output Verification (GO)
 
-- `<output>/schema/openapi.yaml` exists
-- `<output>/generated/client.gen.go` exists
+- No deliverable spec copy is required; input spec provenance is recorded in the manifest below
+- `<output>/internal/generated/client.gen.go` exists
 - `<output>/internal/transport/` exists
 - `<output>/pkg/client/` exists
-- `<output>/sdk/spec-manifest.yaml` exists and records input SHA256
-- `<output>/sdk/retry-policy.yaml` exists and is confirmed
-- `<output>/scripts/regen.sh` exists
+- `<output>/config/spec-manifest.yaml` exists and records input SHA256
+- `<output>/config/retry-policy.yaml` exists and is confirmed
+- `<output>/tools/regen.sh` and `<output>/tools/oapi-codegen.yaml` exist
 - `<output>/go.mod` exists
 - `go test ./...` passes in `<output>/`
 - `.sdkgen/` is not part of final output module
