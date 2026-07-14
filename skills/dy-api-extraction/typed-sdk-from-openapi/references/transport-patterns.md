@@ -20,7 +20,7 @@ Do **not** map HTTP status codes to typed errors inside `RoundTripper`. The `net
 
 ## Operation Key Context Contract
 
-`pkg/client` must attach the **policy operation key** (not an ad-hoc label) before calling generated client methods. The key must match an entry in `<output>/sdk/retry-policy.yaml` `operations`:
+`pkg/client` must attach the **policy operation key** (not an ad-hoc label) before calling generated client methods. The key must match an entry in `<output>/config/retry-policy.yaml` `operations`:
 
 - Use OpenAPI `operationId` when present
 - Otherwise use the derived key from `references/retry-policy-schema.md` (collision-safe `{UPPERCASE_METHOD}_{escaped_path}`)
@@ -34,7 +34,7 @@ ctx = transport.WithOperationID(ctx, "GET_api_v1_funding-rate_history")
 resp, err := c.gen.GetFundingRateHistoryWithResponse(ctx, params)
 ```
 
-Transport reads this key to apply retry rules from `<output>/sdk/retry-policy.yaml`.
+Transport reads this key to apply retry rules from `<output>/config/retry-policy.yaml`.
 
 ## Response Normalization (pkg/client)
 
@@ -65,7 +65,7 @@ Generated client must receive a custom `http.Client` configured with the transpo
 
 ## Do NOT
 
-- Do NOT hand-edit `generated/`
+- Do NOT hand-edit `internal/generated/`
 - Do NOT scatter auth/header logic in endpoint methods
 - Do NOT hardcode retry decisions in generated methods
 - Do NOT convert non-2xx HTTP responses into errors inside `RoundTripper`

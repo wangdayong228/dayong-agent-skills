@@ -27,8 +27,8 @@ Copy or restore `test/` locally before running checks (not shipped with skill in
 
 Validates two behaviors for CoinGlass `fr-ohlc-histroy`:
 
-1. **strict** — Schema gate **NO-GO**; report lists 4 user options; no `schema/openapi.yaml`
-2. **example-fallback** (user option 2) — Schema gate **GO (example-fallback)**; `schema/openapi.yaml` with `x-inferred-from: example`
+1. **strict** — Schema gate **NO-GO**; report lists 4 user options; no `pipeline/openapi/openapi.yaml`
+2. **example-fallback** (user option 2) — Schema gate **GO (example-fallback)**; `pipeline/openapi/openapi.yaml` with `x-inferred-from: example`
 
 Extraction gate may be **GO**, but official response schemas are empty → strict assembly **NO-GO**.
 
@@ -38,8 +38,8 @@ Extraction gate may be **GO**, but official response schemas are empty → stric
 
 ```text
 test/coinglass-fr-ohlc-history/fixture-input/
-  source/raw/
-  docs/api-source-report.md   # optional
+  pipeline/extract/raw/
+  pipeline/extract/report.md   # optional
 ```
 
 **Optional sibling (live re-fetch):**
@@ -62,7 +62,7 @@ chmod +x skills/dy-api-extraction/openapi-from-sources/test/scripts/*.sh
 2. Runs `validate-readiness-output.sh` on golden output
 3. Runs reference generator from `fixture-input/` (strict → NO-GO)
 4. Runs reference generator with `--strictness example-fallback` (GO)
-5. Asserts strict rerun does not delete a prior fallback `schema/openapi.yaml`
+5. Asserts strict rerun does not delete a prior fallback `pipeline/openapi/openapi.yaml`
 
 ## Reference generator (manual)
 
@@ -73,7 +73,7 @@ OUT=$(mktemp -d)
 ./skills/dy-api-extraction/openapi-from-sources/test/scripts/generate-openapi-from-sources.sh \
   skills/dy-api-extraction/openapi-from-sources/test/coinglass-fr-ohlc-history/fixture-input \
   "$OUT"
-ls -la "$OUT/docs" "$OUT/schema" 2>/dev/null || true
+ls -la "$OUT/pipeline/extract" "$OUT/pipeline/openapi" 2>/dev/null || true
 ```
 
 Example-fallback:
@@ -84,7 +84,7 @@ OUT=$(mktemp -d)
   skills/dy-api-extraction/openapi-from-sources/test/coinglass-fr-ohlc-history/fixture-input \
   "$OUT" \
   --strictness example-fallback
-ls -la "$OUT/docs" "$OUT/schema"
+ls -la "$OUT/pipeline/openapi"
 ```
 
 ## Unit tests
@@ -115,6 +115,10 @@ Example-fallback output:
 
 ## Golden expectations
 
-- `test/coinglass-fr-ohlc-history/expected/openapi-readiness-report.md`
+Agent/run output path (production layout): `pipeline/openapi/readiness-report.md` and `pipeline/openapi/openapi.yaml`.
+
+Fixture goldens live under `test/.../expected/` (basename may differ from production path; validators compare content / YAML gates):
+
+- `test/coinglass-fr-ohlc-history/expected/openapi-readiness-report.md` (golden for readiness report content)
 - `test/coinglass-fr-ohlc-history/expected-readiness.yaml`
 - `test/coinglass-fr-ohlc-history/expected-readiness-example-fallback.yaml`

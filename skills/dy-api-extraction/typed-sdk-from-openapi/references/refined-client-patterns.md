@@ -2,7 +2,7 @@
 
 ## Layering
 
-- `generated/`: raw `oapi-codegen` output, never edited
+- `internal/generated/`: raw `oapi-codegen` output, never edited
 - `internal/transport/`: retry/auth/error plumbing
 - `pkg/client/`: public refined API consumed by applications
 
@@ -44,6 +44,6 @@ Example:
 
 ## Do NOT
 
-- Do NOT let call sites import `generated/` directly
+- Do NOT let call sites import `internal/generated/` directly
 - Do NOT leak transport internals as public API
 - Do NOT bypass policy operation key context in refined methods

@@ -3,7 +3,6 @@
 ## Run Metadata
 
 - input_spec_path:
-- normalized_spec_path: `<output>/schema/openapi.yaml`
 - spec_sha256:
 - openapi_version:
 - operation_count:
@@ -22,8 +21,8 @@
 ## Retry Policy Review
 
 - draft_policy_path: `.sdkgen/retry-policy.draft.yaml`
-- confirmed_policy_path: `<output>/sdk/retry-policy.yaml`
-- spec_manifest_path: `<output>/sdk/spec-manifest.yaml`
+- confirmed_policy_path: `<output>/config/retry-policy.yaml`
+- spec_manifest_path: `<output>/config/spec-manifest.yaml`
 - review_mode: `approve all` or overrides
 - overrides:
 
@@ -41,13 +40,13 @@
 
 ## Final Output Checklist (GO only)
 
-- [ ] `<output>/schema/openapi.yaml`
-- [ ] `<output>/generated/client.gen.go`
+- [ ] `<output>/internal/generated/client.gen.go`
 - [ ] `<output>/internal/transport/`
 - [ ] `<output>/pkg/client/`
-- [ ] `<output>/sdk/spec-manifest.yaml`
-- [ ] `<output>/sdk/retry-policy.yaml`
-- [ ] `<output>/scripts/regen.sh`
+- [ ] `<output>/config/spec-manifest.yaml` records in-project `input_spec_path` + SHA256 (typically `pipeline/openapi/openapi.yaml`; no deliverable `schema/openapi.yaml` copy)
+- [ ] `<output>/config/retry-policy.yaml`
+- [ ] `<output>/tools/regen.sh`
+- [ ] `<output>/tools/oapi-codegen.yaml`
 - [ ] `<output>/go.mod`
 - [ ] `go test ./...` passed
 - [ ] final output excludes `.sdkgen/`
@@ -55,7 +54,7 @@
 ## Regen Command
 
 ```bash
-./scripts/regen.sh
+./tools/regen.sh
 go test ./...
 ```
 

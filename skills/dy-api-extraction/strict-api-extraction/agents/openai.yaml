@@ -1,4 +1,4 @@
 interface:
   display_name: "Strict API Extraction"
-  short_description: "Collect official API docs into source/raw and source/snapshots without guessing."
-  default_prompt: "Use strict-api-extraction to collect all official API documentation pages with ego-browser (primary) and Firecrawl (auxiliary), continuing discovery until coverage is satisfied, never guessing undocumented elements, and always writing docs/api-source-report.md."
+  short_description: "Collect official API docs into pipeline/extract without guessing."
+  default_prompt: "Use strict-api-extraction to collect all official API documentation pages with ego-browser (primary) and Firecrawl (auxiliary), continuing discovery until coverage is satisfied, never guessing undocumented elements, and always writing pipeline/extract/report.md."
