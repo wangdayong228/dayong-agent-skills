@@ -20,13 +20,13 @@ This skill intentionally does not ship `test/` or `scripts/` helpers. Verificati
 
 ## Output Verification (GO)
 
-- No deliverable spec copy is required; input spec provenance is recorded in the manifest below
+- No deliverable `schema/openapi.yaml` copy is required; `input_spec_path` must be an in-project file (prefer `pipeline/openapi/openapi.yaml`) recorded in the manifest
 - `<output>/internal/generated/client.gen.go` exists
 - `<output>/internal/transport/` exists
 - `<output>/pkg/client/` exists
 - `<output>/config/spec-manifest.yaml` exists and records input SHA256
 - `<output>/config/retry-policy.yaml` exists and is confirmed
-- `<output>/tools/regen.sh` and `<output>/tools/oapi-codegen.yaml` exist
+- `<output>/tools/regen.sh` and `<output>/tools/oapi-codegen.yaml` exist and regenerate from the in-project `input_spec_path`
 - `<output>/go.mod` exists
 - `go test ./...` passes in `<output>/`
 - `.sdkgen/` is not part of final output module

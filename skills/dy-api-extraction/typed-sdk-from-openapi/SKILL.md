@@ -58,7 +58,7 @@ Do not let `api-client-generator` override or bypass the retry-policy confirmati
 Accepted inputs:
 
 ```text
-pipeline/openapi/openapi.yaml
+pipeline/openapi/openapi.yaml          # preferred; must live in the target project
 <explicit-user-pinned-openapi-3.x-path>
 ```
 
@@ -67,6 +67,7 @@ Requirements:
 - Must be OpenAPI 3.x
 - Must be pinned (fixed file/version/hash) and recorded by SHA256
 - If not trusted/pinned/3.x, write `.sdkgen/sdk-readiness-report.md` and stop with **NO-GO**
+- For Final SDK Gate **GO** / deliverable packages, the OpenAPI file used by `tools/regen.sh` **must** be inside the target project tree (prefer `pipeline/openapi/openapi.yaml`). An external pin (temp path, sibling repo, absolute path outside `<output>`) is allowed only as a **preflight input**; before writing regen config, copy/normalize it into `pipeline/openapi/openapi.yaml` and record that in-repo path in `config/spec-manifest.yaml`. Do **not** invent a top-level deliverable `schema/openapi.yaml`.
 
 ## Output Model
 
@@ -133,8 +134,8 @@ Otherwise **NO-GO**.
 7. **Write confirmed retry policy** to `<output>/config/retry-policy.yaml` with every in-scope operation `confirmed: true` and no `unreviewed`
 8. **Phase A (raw)**: generate `internal/generated/client.gen.go` via `oapi-codegen`
 9. **Phase B (refined)**: implement `internal/transport/` and `pkg/client/`
-10. **Write spec manifest** at `<output>/config/spec-manifest.yaml` with input spec path + SHA256 + generation timestamp
-11. **Write codegen config and regen script** at `<output>/tools/oapi-codegen.yaml` and `<output>/tools/regen.sh` — both must read the **input** OpenAPI from `config/spec-manifest.yaml` `input_spec_path` (typically `pipeline/openapi/openapi.yaml` or the user-pinned path). Do **not** assume or recreate a deliverable `schema/openapi.yaml`
+10. **Write spec manifest** at `<output>/config/spec-manifest.yaml` with in-project input spec path + SHA256 + generation timestamp (`input_spec_path` must resolve inside the target project after any external-pin copy into `pipeline/openapi/openapi.yaml`)
+11. **Write codegen config and regen script** at `<output>/tools/oapi-codegen.yaml` and `<output>/tools/regen.sh` — both must read the **in-project** OpenAPI from `config/spec-manifest.yaml` `input_spec_path` (typically `pipeline/openapi/openapi.yaml`). Do **not** assume or recreate a deliverable `schema/openapi.yaml`. A clean checkout of the module must be able to re-run `tools/regen.sh` without external paths
 12. **Final SDK gate**: validate structure checks + `go test ./...`; then decide GO/NO-GO
 13. **Deliver (GO only)**: on GO, deliver clean `<output>/` and keep `.sdkgen/` outside deliverable; on NO-GO, write `.sdkgen/sdk-readiness-report.md` and stop without delivery
 
@@ -165,12 +166,12 @@ Never patch generated files to add these policies.
 
 Before claiming completion:
 
-- Input spec path is recorded in `<output>/config/spec-manifest.yaml`; no deliverable spec copy is required
+- Input spec path is recorded in `<output>/config/spec-manifest.yaml` and resolves **inside** the project tree (typically `pipeline/openapi/openapi.yaml`); no deliverable `schema/openapi.yaml` copy is required
 - `<output>/internal/generated/client.gen.go` exists and is generated-only
 - `<output>/internal/transport/` and `<output>/pkg/client/` exist and compile
 - `<output>/config/spec-manifest.yaml` exists and includes input OpenAPI path, SHA256 provenance, and generation timestamp
 - `<output>/config/retry-policy.yaml` has confirmed operations and no `unreviewed`
-- `<output>/tools/regen.sh` reproduces generated layer using `<output>/tools/oapi-codegen.yaml`
+- `<output>/tools/regen.sh` reproduces generated layer using `<output>/tools/oapi-codegen.yaml` against the in-project `input_spec_path`
 - `<output>/go test ./...` passes
 - Final output excludes `.sdkgen/` intermediates
 

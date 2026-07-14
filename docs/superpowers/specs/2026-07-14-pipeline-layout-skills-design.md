@@ -91,7 +91,7 @@ Make stage 1–2 outputs land under `pipeline/` by default so a consumer-facing 
 ### strict-api-extraction
 
 - Update Tiers/Storage table, Capture table, Workflow, Deliverable, STOP, and evidence citation text to new extract paths.
-- Target `.gitignore` guidance: `.local/`, `.firecrawl/`, `pipeline/extract/raw/` (stop recommending `source/raw` / `source/snapshots` as the primary raw store; snapshots may still be committed when short).
+- Target `.gitignore` guidance: `.local/`, `.firecrawl/`, `pipeline/extract/raw/`, and `pipeline/extract/snapshots/` by default. Short Tier B snapshots may be force-added only when the user explicitly opts in.
 - Update `references/report-template.md` examples and downstream pointer to `pipeline/openapi/openapi.yaml`.
 - Update `agents/openai.yaml` prompts/descriptions.
 

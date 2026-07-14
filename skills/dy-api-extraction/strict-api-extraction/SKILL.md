@@ -30,7 +30,7 @@ Deliver **source artifacts** (Tier A/B) plus one **derived** report (Tier C). Sc
 | B snapshots | `.firecrawl/` | Firecrawl fallback captures (keep default filenames) | Yes | 3 |
 | C derived | `pipeline/extract/report.md` | Agent-written index | No | — |
 
-No `schema-evidence` or `corpus` folders. Add `.local/`, `.firecrawl/`, and `pipeline/extract/raw/` to the **target project** `.gitignore`. Never commit scraped third-party documentation into user projects. (Maintainer test fixtures in skill repos are optional and follow that repo's `.gitignore`.)
+No `schema-evidence` or `corpus` folders. Add `.local/`, `.firecrawl/`, `pipeline/extract/raw/`, and `pipeline/extract/snapshots/` to the **target project** `.gitignore`. Never commit scraped third-party documentation by default. Short Tier B snapshots may be force-added only when the user **explicitly** opts in to keep reviewable evidence. (Maintainer test fixtures in skill repos are optional and follow that repo's `.gitignore`.)
 
 Schema fields must trace to Tier A or B with `path:line` (`pipeline/extract/raw/`, `pipeline/extract/snapshots/`, or `.firecrawl/`). The report is never sole evidence.
 

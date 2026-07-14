@@ -43,7 +43,7 @@
 - [ ] `<output>/internal/generated/client.gen.go`
 - [ ] `<output>/internal/transport/`
 - [ ] `<output>/pkg/client/`
-- [ ] `<output>/config/spec-manifest.yaml` records `input_spec_path` + SHA256 (no deliverable `schema/openapi.yaml` copy)
+- [ ] `<output>/config/spec-manifest.yaml` records in-project `input_spec_path` + SHA256 (typically `pipeline/openapi/openapi.yaml`; no deliverable `schema/openapi.yaml` copy)
 - [ ] `<output>/config/retry-policy.yaml`
 - [ ] `<output>/tools/regen.sh`
 - [ ] `<output>/tools/oapi-codegen.yaml`
