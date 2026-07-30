@@ -1,55 +1,31 @@
 ---
 name: codex-session-inspector
-description: Use when checking local Codex session models, main-vs-subagent source, reasoning effort, token usage, or recent session details.
+description: >-
+  Use when checking local Codex session models, main-vs-subagent source,
+  reasoning effort, token usage, or recent session details.
 ---
 
 # Codex Session Inspector
 
-Inspect local Codex session history with a Python standard-library CLI.
+Read-only Python CLI for local Codex session history.
 
-Use this skill when user wants to know:
-- Which LLM model Codex recently used
-- Main agent vs subagent model
-- Reasoning effort level
-- Recent session information
-- Codex model occurrence statistics
-- Token usage
-
-## Commands
-
-### Recent model
-
-```bash
-python3 scripts/inspect_sessions.py model --limit 10
-```
-
-### Latest session
-
-```bash
-python3 scripts/inspect_sessions.py latest
-```
-
-### Statistics
-
-```bash
-python3 scripts/inspect_sessions.py stats
-```
-
-### Token usage
-
-```bash
-python3 scripts/inspect_sessions.py tokens --limit 20
-```
-
-### Recent sessions
+| Command | Purpose |
+| --- | --- |
+| `list` | Recent sessions (model, source, cwd, title) |
+| `tokens` | Token usage / context / rate-limit snapshots |
+| `model` | Recent turn model + effort |
+| `latest` | Newest session summary |
+| `stats` | Model occurrence counts |
 
 ```bash
 python3 scripts/inspect_sessions.py list
+python3 scripts/inspect_sessions.py tokens --limit 20
+python3 scripts/inspect_sessions.py model --limit 10
 ```
+
+`--limit` applies to `list` / `tokens` / `model`. Defaults: list/tokens 20, model 50.
 
 ## Notes
 
-- Sessions are stored in nested paths such as `~/.codex/sessions/**/rollout-*.jsonl`.
-- Session titles are read from `~/.codex/session_index.jsonl` for `list`.
-- The CLI is read-only: it does not modify Codex configuration or session data.
-- Set `CODEX_HOME` to inspect another Codex data directory; it defaults to `~/.codex`.
+- Reads `~/.codex/sessions/**/rollout-*.jsonl` (and `session_index.jsonl` for titles); never writes.
+- Optional: `CODEX_HOME` overrides the Codex data root (default `~/.codex`).
