@@ -122,7 +122,15 @@ def read_session(path: Path) -> SessionData:
 
 
 def source_for(session: SessionData) -> str:
-    return text(session.meta.get("thread_source") or "main")
+    thread_source = session.meta.get("thread_source")
+    if thread_source:
+        return text(thread_source)
+    source = session.meta.get("source")
+    if isinstance(source, dict) and "subagent" in source:
+        return "subagent"
+    if isinstance(source, str) and source:
+        return source
+    return "main"
 
 
 def print_table(headers: list[str], rows: list[list[str]]) -> None:
@@ -160,7 +168,7 @@ def command_latest(sessions: list[SessionData]) -> None:
     session = sessions[-1]
     latest_turn = session.turns[-1] if session.turns else {}
     print(f"file: {session.path}")
-    print(f"session_id: {text(session.meta.get('session_id'))}")
+    print(f"session_id: {text(session.meta.get('id') or session.meta.get('session_id'))}")
     print(f"thread_source: {source_for(session)}")
     print(f"cwd: {text(session.meta.get('cwd'))}")
     print(f"model: {text(latest_turn.get('model'))}")
@@ -273,17 +281,28 @@ def main() -> int:
         print(f"Codex session directory not found: {sessions_dir}", file=sys.stderr)
         return 1
 
-    sessions = [read_session(path) for path in session_files(sessions_dir)]
+    paths = session_files(sessions_dir)
     if args.command == "model":
-        command_model(sessions, args.limit or MODEL_LIMIT)
+        limit = args.limit or MODEL_LIMIT
+        sessions: list[SessionData] = []
+        turn_count = 0
+        for path in reversed(paths):
+            session = read_session(path)
+            sessions.append(session)
+            turn_count += len(session.turns)
+            if turn_count >= limit:
+                break
+        command_model(sessions, limit)
     elif args.command == "latest":
-        command_latest(sessions)
+        command_latest([read_session(paths[-1])] if paths else [])
     elif args.command == "stats":
-        command_stats(sessions)
+        command_stats([read_session(path) for path in paths])
     elif args.command == "tokens":
-        command_tokens(sessions, args.limit or SESSION_LIMIT)
+        limit = args.limit or SESSION_LIMIT
+        command_tokens([read_session(path) for path in paths[-limit:]], limit)
     else:
-        command_list(sessions, read_index(codex_home / "session_index.jsonl"), args.limit or SESSION_LIMIT)
+        limit = args.limit or SESSION_LIMIT
+        command_list([read_session(path) for path in paths[-limit:]], read_index(codex_home / "session_index.jsonl"), limit)
     return 0
 
 
