@@ -28,4 +28,3 @@ python3 scripts/inspect_sessions.py model --limit 10
 ## Notes
 
 - Reads `~/.codex/sessions/**/rollout-*.jsonl` (and `session_index.jsonl` for titles); never writes.
-- Optional: `CODEX_HOME` overrides the Codex data root (default `~/.codex`).
