@@ -8,12 +8,15 @@ import urllib.parse
 from pathlib import Path
 
 
-INLINE_LINK_START = re.compile(r"!?\[[^\]]*\]\(\s*")
+LINK_LABEL_START = re.compile(r"!?\[")
 REFERENCE_LINK = re.compile(r"^\s*\[[^\]]+\]:\s*(?:<([^>]+)>|(\S+))", re.MULTILINE)
-HTML_LINK = re.compile(r"\b(?:href|src)\s*=\s*[\"']([^\"']+)[\"']", re.IGNORECASE)
+HTML_LINK = re.compile(
+    r'''\b(?:href|src)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))''',
+    re.IGNORECASE,
+)
 HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
-TITLE_SUFFIX = re.compile(r"""\s+["'][^"']*["']\s*$""")
-EXTERNAL_SCHEMES = {"http", "https", "mailto", "tel", "data", "javascript"}
+TITLE_SUFFIX = re.compile(r"""\s+(?:["'][^"']*["']|\([^()]*\))\s*$""")
+SETEXT_UNDERLINE = re.compile(r"^\s*(?:=+|-+)\s*$")
 
 
 def strip_fenced_code(text: str) -> str:
@@ -34,6 +37,28 @@ def strip_fenced_code(text: str) -> str:
     return "".join(lines)
 
 
+def strip_inline_code(text: str) -> str:
+    characters = list(text)
+    cursor = 0
+    while cursor < len(text):
+        if text[cursor] != "`":
+            cursor += 1
+            continue
+        run_end = cursor
+        while run_end < len(text) and text[run_end] == "`":
+            run_end += 1
+        marker = text[cursor:run_end]
+        close = text.find(marker, run_end)
+        if close == -1:
+            cursor = run_end
+            continue
+        for index in range(cursor, close + len(marker)):
+            if characters[index] != "\n":
+                characters[index] = " "
+        cursor = close + len(marker)
+    return "".join(characters)
+
+
 def slug_base(heading: str) -> str:
     heading = re.sub(r"<[^>]+>", "", heading).strip().lower()
     heading = re.sub(r"[^\w\- ]", "", heading, flags=re.UNICODE)
@@ -44,28 +69,58 @@ def anchors(path: Path) -> set[str]:
     counts: dict[str, int] = {}
     result: set[str] = set()
     text = strip_fenced_code(path.read_text(encoding="utf-8"))
-    for line in text.splitlines():
+    lines = text.splitlines()
+    headings: list[str] = []
+    for index, line in enumerate(lines):
         match = HEADING.match(line)
-        if not match:
-            continue
-        base = slug_base(match.group(2))
+        if match:
+            headings.append(match.group(2))
+        elif index > 0 and SETEXT_UNDERLINE.match(line) and lines[index - 1].strip():
+            headings.append(lines[index - 1].strip())
+
+    for heading in headings:
+        base = slug_base(heading)
         index = counts.get(base, 0)
+        candidate = base if index == 0 else f"{base}-{index}"
+        while candidate in result:
+            index += 1
+            candidate = f"{base}-{index}"
         counts[base] = index + 1
-        result.add(base if index == 0 else f"{base}-{index}")
+        result.add(candidate)
     return result
 
 
 def inline_destinations(text: str) -> list[tuple[int, str]]:
     found: list[tuple[int, str]] = []
-    for match in INLINE_LINK_START.finditer(text):
+    for match in LINK_LABEL_START.finditer(text):
         cursor = match.end()
+        depth = 0
+        escaped = False
+        while cursor < len(text):
+            character = text[cursor]
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == "[":
+                depth += 1
+            elif character == "]":
+                if depth == 0:
+                    break
+                depth -= 1
+            cursor += 1
+        if cursor == len(text) or cursor + 1 >= len(text) or text[cursor + 1] != "(":
+            continue
+        cursor += 2
+        while cursor < len(text) and text[cursor].isspace():
+            cursor += 1
         if cursor < len(text) and text[cursor] == "<":
             end = text.find(">", cursor + 1)
             if end == -1:
                 continue
             target = text[cursor + 1 : end]
         else:
-            start = cursor
+            target_start = cursor
             depth = 0
             escaped = False
             while cursor < len(text):
@@ -83,14 +138,14 @@ def inline_destinations(text: str) -> list[tuple[int, str]]:
                 cursor += 1
             if cursor == len(text):
                 continue
-            target = text[start:cursor]
+            target = text[target_start:cursor]
         line = text.count("\n", 0, match.start()) + 1
         found.append((line, TITLE_SUFFIX.sub("", target.strip())))
     return found
 
 
 def destinations(text: str) -> list[tuple[int, str]]:
-    clean = strip_fenced_code(text)
+    clean = strip_inline_code(strip_fenced_code(text))
     found = inline_destinations(clean)
     for pattern in (REFERENCE_LINK, HTML_LINK):
         for match in pattern.finditer(clean):
@@ -135,7 +190,7 @@ def check_file(root: Path, source: Path) -> list[str]:
         target = raw_target.strip()
         parsed = urllib.parse.urlsplit(target)
         if (
-            parsed.scheme.lower() in EXTERNAL_SCHEMES
+            parsed.scheme
             or parsed.netloc
             or target.startswith("/")
         ):
