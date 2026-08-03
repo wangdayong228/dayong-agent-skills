@@ -1,8 +1,17 @@
+import json
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+except ModuleNotFoundError:
+    yaml = types.ModuleType("yaml")
+    yaml.safe_load = json.loads
+    yaml.safe_dump = lambda value, **_kwargs: json.dumps(value)
+    sys.modules["yaml"] = yaml
 
 from draft_retry_policy import derive_operation_id, draft_retry_policy
 
@@ -73,6 +82,47 @@ class DraftRetryPolicyTest(unittest.TestCase):
             spec.write_text(yaml.safe_dump(dup_spec), encoding="utf-8")
             with self.assertRaises(ValueError):
                 draft_retry_policy(str(spec))
+
+    def test_path_item_idempotency_header_is_inherited(self):
+        spec_doc = {
+            "openapi": "3.0.3",
+            "info": {"title": "t", "version": "1"},
+            "paths": {
+                "/items": {
+                    "parameters": [{"name": "Idempotency-Key", "in": "header", "schema": {"type": "string"}}],
+                    "post": {"operationId": "CreateItem", "responses": {"201": {"description": "created"}}},
+                }
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = Path(tmp) / "openapi.yaml"
+            spec.write_text(yaml.safe_dump(spec_doc), encoding="utf-8")
+            result = draft_retry_policy(str(spec))
+        entry = result["operations"]["CreateItem"]
+        self.assertEqual(entry["policy"], "idempotent_key_required")
+        self.assertEqual(entry["idempotency_header"], "Idempotency-Key")
+
+    def test_request_id_header_does_not_make_write_retryable(self):
+        spec_doc = {
+            "openapi": "3.0.3",
+            "info": {"title": "t", "version": "1"},
+            "paths": {
+                "/items": {
+                    "post": {
+                        "operationId": "CreateItem",
+                        "parameters": [{"name": "X-Request-ID", "in": "header", "schema": {"type": "string"}}],
+                        "responses": {"201": {"description": "created"}},
+                    }
+                }
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = Path(tmp) / "openapi.yaml"
+            spec.write_text(yaml.safe_dump(spec_doc), encoding="utf-8")
+            result = draft_retry_policy(str(spec))
+        entry = result["operations"]["CreateItem"]
+        self.assertEqual(entry["policy"], "non_retryable")
+        self.assertEqual(entry["idempotency_header"], "")
 
 
 if __name__ == "__main__":

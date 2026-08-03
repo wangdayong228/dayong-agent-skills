@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Ensure scripts/.venv with PyYAML; print python path.
+# Find an existing Python with PyYAML; never install dependencies.
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV="$SCRIPT_DIR/.venv"
-
-if [[ ! -x "$VENV/bin/python3" ]]; then
-  python3 -m venv "$VENV"
-  "$VENV/bin/pip" install -q pyyaml
+if command -v python3 >/dev/null 2>&1; then
+  candidate="$(command -v python3)"
+  if "$candidate" -c 'import yaml' >/dev/null 2>&1; then
+    echo "$candidate"
+    exit 0
+  fi
 fi
 
-echo "$VENV/bin/python3"
+echo "bootstrap-python: PyYAML is required; install it for an existing python3 interpreter" >&2
+exit 1

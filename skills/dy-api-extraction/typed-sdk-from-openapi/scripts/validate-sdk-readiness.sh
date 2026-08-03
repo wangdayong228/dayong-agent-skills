@@ -18,20 +18,45 @@ if [[ ! -f "$RUN_DIR/sdk/retry-policy.yaml" ]]; then
   exit 0
 fi
 
-if ! "$PYTHON" - <<'PY' "$RUN_DIR/sdk/retry-policy.yaml"
+if ! "$PYTHON" - <<'PY' "$RUN_DIR/sdk/retry-policy.yaml" "$RUN_DIR/schema/openapi.yaml"
 import sys
 import yaml
 from pathlib import Path
 
-doc = yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8"))
-ops = doc.get("operations") or {}
+import re
+
+policy_doc = yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8")) or {}
+openapi_doc = yaml.safe_load(Path(sys.argv[2]).read_text(encoding="utf-8")) or {}
+ops = policy_doc.get("operations") or {}
+methods = {"get", "head", "options", "post", "put", "patch", "delete"}
+
+def fallback_operation_id(method, path):
+    parts = [part for part in re.split(r"[^a-zA-Z0-9]+", path.strip("/")) if part]
+    return "".join(token[:1].upper() + token[1:] for token in [method.lower(), *parts])
+
+inventory = set()
+for path, path_item in (openapi_doc.get("paths") or {}).items():
+    if not isinstance(path_item, dict):
+        continue
+    for method, operation in path_item.items():
+        if method.lower() not in methods or not isinstance(operation, dict):
+            continue
+        inventory.add(operation.get("operationId") or fallback_operation_id(method, path))
+for op_id in sorted(inventory - set(ops)):
+    print(f"missing-operation:{op_id}")
+    sys.exit(2)
 for op_id, entry in ops.items():
     if entry.get("policy") == "unreviewed":
         print(f"unreviewed:{op_id}")
-        sys.exit(2)
+        sys.exit(3)
+    if entry.get("policy") == "idempotent_key_required" and not str(
+        entry.get("idempotency_header") or ""
+    ).strip():
+        print(f"missing-idempotency-header:{op_id}")
+        sys.exit(4)
     if not entry.get("confirmed"):
         print(f"unconfirmed:{op_id}")
-        sys.exit(3)
+        sys.exit(5)
 print(f"operations={len(ops)}")
 PY
 then

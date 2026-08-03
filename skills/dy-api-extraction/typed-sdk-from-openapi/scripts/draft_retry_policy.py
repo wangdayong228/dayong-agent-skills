@@ -13,7 +13,6 @@ import yaml
 IDEMPOTENCY_HEADER_NAMES = {
     "idempotency-key",
     "x-idempotency-key",
-    "x-request-id",
 }
 
 READ_METHODS = {"get", "head", "options"}
@@ -26,8 +25,17 @@ def derive_operation_id(method: str, path: str) -> str:
     return "".join(t[:1].upper() + t[1:] for t in tokens if t)
 
 
-def _find_idempotency_header(operation: dict[str, Any]) -> str | None:
+def _find_idempotency_header(
+    operation: dict[str, Any], path_parameters: list[dict[str, Any]] | None = None
+) -> str | None:
+    parameters: dict[tuple[str, str], dict[str, Any]] = {}
+    for param in path_parameters or []:
+        if isinstance(param, dict):
+            parameters[(str(param.get("in", "")), str(param.get("name", "")).lower())] = param
     for param in operation.get("parameters") or []:
+        if isinstance(param, dict):
+            parameters[(str(param.get("in", "")), str(param.get("name", "")).lower())] = param
+    for param in parameters.values():
         if param.get("in") != "header":
             continue
         name = str(param.get("name", ""))
@@ -36,9 +44,11 @@ def _find_idempotency_header(operation: dict[str, Any]) -> str | None:
     return None
 
 
-def _suggest_policy(method: str, operation: dict[str, Any]) -> tuple[str, str, str]:
+def _suggest_policy(
+    method: str, operation: dict[str, Any], path_parameters: list[dict[str, Any]] | None = None
+) -> tuple[str, str, str]:
     method = method.lower()
-    header = _find_idempotency_header(operation) or ""
+    header = _find_idempotency_header(operation, path_parameters) or ""
     if operation.get("x-idempotent") is True:
         return "retryable", header, "x-idempotent: true on operation"
     if header:
@@ -66,7 +76,9 @@ def draft_retry_policy(openapi_path: str) -> dict[str, Any]:
                 raise ValueError(
                     f"duplicate operationId {op_id!r} for {method.upper()} {path}"
                 )
-            policy, header, reason = _suggest_policy(method, operation)
+            policy, header, reason = _suggest_policy(
+                method, operation, path_item.get("parameters") or []
+            )
             operations[op_id] = {
                 "method": method.upper(),
                 "path": path,

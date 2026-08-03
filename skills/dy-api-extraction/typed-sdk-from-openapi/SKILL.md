@@ -29,7 +29,7 @@ Deliver **sdk-readiness report** always. Deliver **full SDK tree** only on SDK G
 | --- | --- | --- |
 | `oapi-codegen` v2 | **Yes** | Raw client/types generation |
 | Go 1.22+ | **Yes** | Refined SDK module |
-| PyYAML (via `scripts/bootstrap-python.sh`) | **Yes** | Draft/validate retry-policy |
+| PyYAML (available to an existing `python3`) | **Yes** | Draft/validate retry-policy; bootstrap never installs dependencies |
 
 ## Target Layout (Run Directory)
 
@@ -138,8 +138,7 @@ Map non-2xx to typed errors (`AuthError`, `NotFoundError`, `ValidationError`, `R
 
 ```bash
 ./skills/dy-api-extraction/typed-sdk-from-openapi/scripts/validate-sdk-readiness.sh \
-  /path/to/run-dir \
-  skills/dy-api-extraction/typed-sdk-from-openapi/test/coinglass-fr-ohlc-history/expected/retry-policy.yaml
+  /path/to/run-dir
 
 go test ./...
 ```
