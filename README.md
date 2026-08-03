@@ -17,6 +17,7 @@
 | `strict-api-extraction` | 从官方 API 文档站完整采集原始素材（`pipeline/extract/raw/` + `pipeline/extract/snapshots/`）并产出 `pipeline/extract/report.md`；coverage 不足时继续抓取，禁止猜测未文档化的 schema 元素。**依赖：** 需单独安装 `ego-browser`；可选 `firecrawl-scrape` / `firecrawl-map` |
 | `openapi-from-sources` | 基于已有素材（含 strict-api-extraction 产出）校验是否足够生成 OpenAPI 3.x；strict NO-GO 时报告 4 个编号选项，用户选 example-fallback 后可从官方 example 生成带标注的 `pipeline/openapi/openapi.yaml`。**依赖：** 素材需已采集；下游可用 `api-client-generator` 或 `typed-sdk-from-openapi`（Go） |
 | `typed-sdk-from-openapi` | 输入可信且 pinned 的 OpenAPI 3.x 文档（优先 `pipeline/openapi/openapi.yaml`），先通过 preflight + 依赖检查，加载 `api-client-generator` 约束后先完成 retry policy 草案/审阅/确认 gate，再进入 Phase A/B 生成与封装，最终产出 2 层 Go SDK（`internal/generated/` + `pkg/client/`，`internal/transport/` 作为内部实现），并写入 `config/` 与 `tools/`；中间产物落到 `.sdkgen/`，NO-GO fail-fast 仅输出报告。**依赖：** `api-client-generator`；若存在 `retryable` 操作还需 `rate-limit-handler` |
+| `build-project-docs` | 从当前代码和测试建立或重构完整项目文档；适用于 README 过度聚焦局部机制、需要 Usage/Architecture/Spec/Development 多视角文档，或需要整体/模块架构图与插画的场景 |
 | `small-feature-autopilot` | 用户要求小功能自动做到底、无需中途确认时（如「自动到底」「小功能」「无需确认」）；单子系统、低风险、无 breaking。超出门禁则停并建议完整 `brainstorming` → 审阅 → `writing-plans` 流程 |
 | `codex-session-inspector` | 查看本地 Codex 会话：近期模型、主/子代理、reasoning effort、token 用量、最近会话列表；只读 `~/.codex/sessions/**/rollout-*.jsonl`（Python stdlib CLI） |
 
@@ -64,6 +65,7 @@ npx skills add wangdayong228/dayong-agent-skills --skill iterative-code-review -
 npx skills add wangdayong228/dayong-agent-skills --skill strict-api-extraction -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill openapi-from-sources -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill typed-sdk-from-openapi -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill build-project-docs -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill small-feature-autopilot -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill codex-session-inspector -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
@@ -81,6 +83,7 @@ npx skills add wangdayong228/dayong-agent-skills@iterative-code-review -g -y
 npx skills add wangdayong228/dayong-agent-skills@strict-api-extraction -g -y
 npx skills add wangdayong228/dayong-agent-skills@openapi-from-sources -g -y
 npx skills add wangdayong228/dayong-agent-skills@typed-sdk-from-openapi -g -y
+npx skills add wangdayong228/dayong-agent-skills@build-project-docs -g -y
 npx skills add wangdayong228/dayong-agent-skills@small-feature-autopilot -g -y
 npx skills add wangdayong228/dayong-agent-skills@codex-session-inspector -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）

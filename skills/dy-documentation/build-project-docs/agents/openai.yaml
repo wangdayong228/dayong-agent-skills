@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build Project Docs"
+  short_description: "Build code-verified project and module documentation."
+  default_prompt: "Use $build-project-docs to audit this repository, present documentation architecture options for approval, and build the approved code-verified documentation and visuals."
