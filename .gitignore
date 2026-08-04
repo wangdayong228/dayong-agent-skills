@@ -8,6 +8,7 @@
 # git worktrees
 .worktrees/
 
-# python bytecode cache
+# python bytecode cache and skill script venvs
 __pycache__/
 *.pyc
+**/.venv/
