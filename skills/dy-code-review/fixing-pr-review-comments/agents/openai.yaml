@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fixing PR Review Comments"
+  short_description: "Verify and fix PR review feedback"
+  default_prompt: "Get the latest PR review comments, verify each claim, and fix confirmed issues."

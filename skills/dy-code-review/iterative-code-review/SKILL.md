@@ -33,7 +33,7 @@ Before editing code, load the environment's relevant skills by capability:
 - High-stakes implementation/testing capability for money, security, permissions, data loss, contracts, transactions, migrations, or irreversible actions.
 - Verification and consistency capability before claiming completion.
 
-If the request is about GitHub PR comments or review threads, use `pr-comment-review` first, then use this skill only for the local review loop.
+If the request is about GitHub PR comments or review threads, use `fixing-pr-review-comments` first, then use this skill only for the local review loop.
 
 ## Loop Contract
 
