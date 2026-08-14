@@ -43,7 +43,7 @@
 
 ### Task 1: Plan Assistant skill、模板与静态合同
 
-- [ ] **Step 1: 使用官方 initializer 创建 scaffold**
+- [x] **Step 1: 使用官方 initializer 创建 scaffold**
 
 运行：
 
@@ -59,7 +59,7 @@ python3 /Users/dayong/.agents/skills/.system/skill-creator/scripts/init_skill.py
 
 预期：创建 skill、`scripts/`、`references/` 和 metadata scaffold；不使用 `--examples`。
 
-- [ ] **Step 2: 写入完整失败测试**
+- [x] **Step 2: 写入完整失败测试**
 
 创建 `skills/dy-workflow/superpowers-plan-assistant/scripts/test_plan_assistant_contract.py`：
 
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 3: 运行 RED**
+- [x] **Step 3: 运行 RED**
 
 运行：
 
@@ -264,7 +264,7 @@ python3 -m unittest \
 
 预期：FAIL，因为 scaffold 尚无模板和合同语句；不能通过删断言或放宽边界获得 GREEN。
 
-- [ ] **Step 4: 写入固定报告模板**
+- [x] **Step 4: 写入固定报告模板**
 
 创建 `skills/dy-workflow/superpowers-plan-assistant/references/report-template.md`：
 
@@ -320,7 +320,7 @@ python3 -m unittest \
 不适用：原版 executor 未决定并行。
 ```
 
-- [ ] **Step 5: 写入 skill 指令与元数据**
+- [x] **Step 5: 写入 skill 指令与元数据**
 
 用以下内容完整替换 `skills/dy-workflow/superpowers-plan-assistant/SKILL.md`：
 
@@ -436,7 +436,7 @@ policy:
   allow_implicit_invocation: true
 ```
 
-- [ ] **Step 6: 运行 GREEN**
+- [x] **Step 6: 运行 GREEN**
 
 运行：
 
@@ -447,7 +447,7 @@ python3 -m unittest \
 
 预期：全部 PASS。若失败，只修正内容或明确的测试错误，不放宽 upstream 边界。
 
-- [ ] **Step 7: 运行一次 enabled LLM smoke**
+- [x] **Step 7: 运行一次 enabled LLM smoke**
 
 运行一次：
 
@@ -506,7 +506,7 @@ writing-plans self-review for this Plan is complete. Generate the adjacent repor
 不声称完成。LLM 复查后仍越界或无法判断时，只记录三态和剩余风险并结束本 smoke，
 不再修改或采样；LLM 结果本身不控制提交或完成。措辞或格式差异不触发修改或重跑。
 
-- [ ] **Step 8: 验证 metadata（前置依赖可用时）**
+- [x] **Step 8: 验证 metadata（前置依赖可用时）**
 
 先运行：
 
@@ -525,7 +525,7 @@ python3 /Users/dayong/.agents/skills/.system/skill-creator/scripts/quick_validat
 
 预期：`Skill is valid!`。validator 未运行不改变原版 Superpowers 流程；静态合同测试仍是本 Task 的完成证据。
 
-- [ ] **Step 9: 提交本 Task**
+- [x] **Step 9: 提交本 Task**
 
 ```bash
 git add skills/dy-workflow/superpowers-plan-assistant

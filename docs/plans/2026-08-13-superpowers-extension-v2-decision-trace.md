@@ -61,7 +61,7 @@ decision_trace.py record SPEC --topic TOPIC --decision DECISION \
 
 ### Task 1: Decision Trace skill 与确定性 helper
 
-- [ ] **Step 1: 使用官方 initializer 创建 scaffold**
+- [x] **Step 1: 使用官方 initializer 创建 scaffold**
 
 运行：
 
@@ -77,7 +77,7 @@ python3 /Users/dayong/.agents/skills/.system/skill-creator/scripts/init_skill.py
 
 预期：创建 skill、`scripts/` 和 `agents/openai.yaml` scaffold；不得生成示例或额外 resource。
 
-- [ ] **Step 2: 写入完整失败测试**
+- [x] **Step 2: 写入完整失败测试**
 
 创建 `skills/dy-workflow/superpowers-decision-trace/scripts/test_decision_trace.py`：
 
@@ -154,6 +154,20 @@ class DecisionTraceTests(unittest.TestCase):
         before = trace.read_bytes()
         self.assertEqual(dt.record_decision(self.design, self.entry()), "unchanged")
         self.assertEqual(trace.read_bytes(), before)
+
+    def test_same_text_user_reconfirmation_refreshes_provenance(self) -> None:
+        approved = dt.Decision(
+            "部署模式",
+            "只使用本地文件。",
+            dt.APPROVED_PREFIX + "api.v2-design.md#部署",
+            date(2026, 8, 13),
+        )
+        confirmed = dt.Decision(
+            "部署模式", "只使用本地文件。", dt.USER_SOURCE, date(2026, 8, 14)
+        )
+        dt.record_decision(self.design, approved)
+        self.assertEqual(dt.record_decision(self.design, confirmed), "replaced")
+        self.assertEqual(dt.load_decisions(self.design), [confirmed])
 
     def test_conflict_preserves_original_bytes(self) -> None:
         dt.record_decision(self.design, self.entry())
@@ -312,7 +326,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 3: 运行 RED**
+- [x] **Step 3: 运行 RED**
 
 运行：
 
@@ -323,7 +337,7 @@ python3 -m unittest \
 
 预期：ERROR/FAIL，明确原因是 `decision_trace.py` 尚不存在；不能通过放宽测试获得 GREEN。
 
-- [ ] **Step 4: 写入最小 helper**
+- [x] **Step 4: 写入最小 helper**
 
 创建 `skills/dy-workflow/superpowers-decision-trace/scripts/decision_trace.py`：
 
@@ -536,9 +550,9 @@ def record_decision(
         for index, current in enumerate(entries):
             if current.topic != entry.topic:
                 continue
-            if current.decision == entry.decision:
+            if current == entry:
                 return "unchanged"
-            if not replace_conflict:
+            if current.decision != entry.decision and not replace_conflict:
                 return "conflict"
             entries[index] = entry
             _atomic_write(trace, _render(entries))
@@ -624,7 +638,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 5: 写入 skill 指令和元数据**
+- [x] **Step 5: 写入 skill 指令和元数据**
 
 用以下内容完整替换 `skills/dy-workflow/superpowers-decision-trace/SKILL.md`：
 
@@ -710,7 +724,7 @@ policy:
   allow_implicit_invocation: true
 ```
 
-- [ ] **Step 6: 运行 GREEN 和现有回归测试**
+- [x] **Step 6: 运行 GREEN 和现有回归测试**
 
 运行：
 
@@ -723,7 +737,7 @@ python3 -m unittest \
 
 预期：Decision Trace 测试全部 PASS；现有 8 个链接测试仍 PASS。若失败，只修正实现或明确的测试错误，不放宽批准合同。
 
-- [ ] **Step 7: 运行一次 enabled LLM smoke**
+- [x] **Step 7: 运行一次 enabled LLM smoke**
 
 运行一次：
 
@@ -770,7 +784,7 @@ clarification for ABSOLUTE_SMOKE_DIR/feature-design.md. Only output the next mes
 和剩余风险并结束本 smoke，不再修改或采样；LLM 结果本身不控制提交或完成。措辞或格式
 差异不触发修改或重跑。
 
-- [ ] **Step 8: 验证 metadata（前置依赖可用时）**
+- [x] **Step 8: 验证 metadata（前置依赖可用时）**
 
 先运行：
 
@@ -789,7 +803,7 @@ python3 /Users/dayong/.agents/skills/.system/skill-creator/scripts/quick_validat
 
 预期：`Skill is valid!`。validator 未运行不改变原版 Superpowers 流程；确定性单元测试仍是本 Task 的完成证据。
 
-- [ ] **Step 9: 提交本 Task**
+- [x] **Step 9: 提交本 Task**
 
 ```bash
 git add skills/dy-workflow/superpowers-decision-trace

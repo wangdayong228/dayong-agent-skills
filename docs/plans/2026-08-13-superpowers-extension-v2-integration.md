@@ -35,7 +35,7 @@
 
 ### Task 1: 仓库集成合同与 README
 
-- [ ] **Step 1: 写入完整失败测试**
+- [x] **Step 1: 写入完整失败测试**
 
 创建测试目录：
 
@@ -295,7 +295,7 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: 运行 RED**
+- [x] **Step 2: 运行 RED**
 
 运行：
 
@@ -305,7 +305,7 @@ python3 -m unittest scripts/test_superpowers_extension_v2_contract.py -v
 
 预期：FAIL，明确原因是 README 尚未列出三个 V2 skill；若失败原因来自 Task 1-3 未完成，先停止并完成其前置计划，不要伪造 GREEN。
 
-- [ ] **Step 3: 精确更新 README**
+- [x] **Step 3: 精确更新 README**
 
 在 `README.md` 的“已包含的 Skills”表中，紧跟 `codex-session-inspector` 行加入：
 
@@ -344,7 +344,7 @@ npx skills add wangdayong228/dayong-agent-skills@superpowers-execution-timing -g
 
 不要把三个 skill 描述为一个自动串联 workflow，也不要增加单一“安装 Extension V2”控制入口。
 
-- [ ] **Step 4: 运行跨 skill GREEN 与全量确定性测试**
+- [x] **Step 4: 运行跨 skill GREEN 与全量确定性测试**
 
 运行：
 
@@ -361,7 +361,7 @@ python3 -m unittest \
 
 同一确定性失败最多两轮针对性修复，只重跑受影响测试；仍失败时记录命令和剩余问题并停止，不全量循环。
 
-- [ ] **Step 5: 执行一次有界人工边界审阅**
+- [x] **Step 5: 执行一次有界人工边界审阅**
 
 逐项对照批准 spec，只审阅一次并记录：
 
@@ -398,7 +398,7 @@ python3 -m unittest scripts/test_superpowers_extension_v2_contract.py -v
 有问题时记录剩余风险并停止，不提交、不声称完成。该审阅不产生 READY/hash 或执行 gate。
 若修正必须改变原版 Superpowers 规则，立即停止并询问用户。
 
-- [ ] **Step 6: 运行原版完成验证链**
+- [x] **Step 6: 运行原版完成验证链**
 
 依次使用：
 
@@ -411,7 +411,7 @@ post-verification-check
 
 这是原版 Superpowers 的既有完成流程，不由 Extension V2 增加、跳过或重复。不得根据 report、trace 或 timing 状态改变该流程。
 
-- [ ] **Step 7: 提交集成改动**
+- [x] **Step 7: 提交集成改动**
 
 ```bash
 git status --short -- \
