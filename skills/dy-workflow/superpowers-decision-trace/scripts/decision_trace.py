@@ -133,8 +133,8 @@ def record_decision(spec: Path, entry: Decision, *, replace_conflict: bool = Fal
         entries = load_decisions(spec)
         for index, current in enumerate(entries):
             if current.topic != entry.topic: continue
-            if current.decision == entry.decision: return "unchanged"
-            if not replace_conflict: return "conflict"
+            if current == entry: return "unchanged"
+            if current.decision != entry.decision and not replace_conflict: return "conflict"
             entries[index] = entry; _atomic_write(trace, _render(entries)); return "replaced"
         entries.append(entry); _atomic_write(trace, _render(entries)); return "created"
 

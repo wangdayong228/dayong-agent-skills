@@ -71,6 +71,20 @@ class DecisionTraceTests(unittest.TestCase):
         self.assertEqual(dt.record_decision(self.design, self.entry()), "unchanged")
         self.assertEqual(trace.read_bytes(), before)
 
+    def test_same_text_user_reconfirmation_refreshes_provenance(self) -> None:
+        approved = dt.Decision(
+            "部署模式",
+            "只使用本地文件。",
+            dt.APPROVED_PREFIX + "api.v2-design.md#部署",
+            date(2026, 8, 13),
+        )
+        confirmed = dt.Decision(
+            "部署模式", "只使用本地文件。", dt.USER_SOURCE, date(2026, 8, 14)
+        )
+        dt.record_decision(self.design, approved)
+        self.assertEqual(dt.record_decision(self.design, confirmed), "replaced")
+        self.assertEqual(dt.load_decisions(self.design), [confirmed])
+
     def test_conflict_preserves_original_bytes(self) -> None:
         dt.record_decision(self.design, self.entry())
         trace = dt.adjacent_trace_path(self.design)
