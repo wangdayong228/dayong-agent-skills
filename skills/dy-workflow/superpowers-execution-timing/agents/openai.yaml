@@ -1,0 +1,7 @@
+interface:
+  display_name: "Superpowers Execution Timing"
+  short_description: "Record natural Plan steps without blocking."
+  default_prompt: "Use $superpowers-execution-timing after the original executor starts this Plan."
+
+policy:
+  allow_implicit_invocation: true
