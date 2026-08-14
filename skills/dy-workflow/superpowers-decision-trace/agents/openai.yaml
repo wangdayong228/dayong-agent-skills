@@ -1,0 +1,7 @@
+interface:
+  display_name: "Superpowers Decision Trace"
+  short_description: "Reuse confirmed decisions without repeat questions."
+  default_prompt: "Use $superpowers-decision-trace while refining this written spec."
+
+policy:
+  allow_implicit_invocation: true
