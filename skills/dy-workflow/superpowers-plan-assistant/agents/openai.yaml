@@ -1,0 +1,7 @@
+interface:
+  display_name: "Superpowers Plan Assistant"
+  short_description: "Surface user decisions and review technical Plan risks."
+  default_prompt: "Use $superpowers-plan-assistant after the original writing-plans self-review to analyze this implementation Plan."
+
+policy:
+  allow_implicit_invocation: true
