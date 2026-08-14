@@ -20,6 +20,11 @@
 | `build-project-docs` | 从当前代码和测试建立或重构完整项目文档；适用于 README 过度聚焦局部机制、需要 Usage/Architecture/Spec/Development 多视角文档，或需要整体/模块架构图与插画的场景 |
 | `small-feature-autopilot` | 用户要求小功能自动做到底、无需中途确认时（如「自动到底」「小功能」「无需确认」）；单子系统、低风险、无 breaking。超出门禁则停并建议完整 `brainstorming` → 审阅 → `writing-plans` 流程 |
 | `codex-session-inspector` | 查看本地 Codex 会话：近期模型、主/子代理、reasoning effort、token 用量、最近会话列表；只读 `~/.codex/sessions/**/rollout-*.jsonl`（Python stdlib CLI） |
+| `superpowers-decision-trace` | brainstorming/spec 修订期间复用相邻已确认决策；失败仅 warning |
+| `superpowers-plan-assistant` | writing-plans self-review 后筛出用户必须核实事项并提供技术/DAG findings；不形成门禁 |
+| `superpowers-execution-timing` | 原版 executor 开始后旁路记录自然 step 的真实耗时；不改变粒度或调度 |
+
+三个 V2 skill 独立安装、独立触发，互不调用；它们只提供旁路信息，不组成自动串联工作流，也不控制原版 Superpowers 是否继续。
 
 > **BREAKING CHANGE：** `dy-api-extraction` 默认采用 `pipeline/` 布局，**不兼容**旧顶层路径：
 > - 采集：`source/raw|snapshots` → `pipeline/extract/raw|snapshots`；报告 `docs/api-source-report.md` → `pipeline/extract/report.md`
@@ -68,6 +73,9 @@ npx skills add wangdayong228/dayong-agent-skills --skill typed-sdk-from-openapi 
 npx skills add wangdayong228/dayong-agent-skills --skill build-project-docs -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill small-feature-autopilot -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill codex-session-inspector -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill superpowers-decision-trace -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill superpowers-plan-assistant -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill superpowers-execution-timing -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
@@ -86,11 +94,19 @@ npx skills add wangdayong228/dayong-agent-skills@typed-sdk-from-openapi -g -y
 npx skills add wangdayong228/dayong-agent-skills@build-project-docs -g -y
 npx skills add wangdayong228/dayong-agent-skills@small-feature-autopilot -g -y
 npx skills add wangdayong228/dayong-agent-skills@codex-session-inspector -g -y
+npx skills add wangdayong228/dayong-agent-skills@superpowers-decision-trace -g -y
+npx skills add wangdayong228/dayong-agent-skills@superpowers-plan-assistant -g -y
+npx skills add wangdayong228/dayong-agent-skills@superpowers-execution-timing -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
 # codex-session-inspector 需本机有 python3，并可读 ~/.codex/sessions
 ```
+
+**V2 运行要求：** `superpowers-decision-trace` 与 `superpowers-execution-timing` 使用
+`python3` helper；helper 只使用 Python 标准库，不需要第三方运行时依赖。并发安全写入使用 POSIX `fcntl`；
+缺少 `fcntl` 时写入失败只 warning，原版 Superpowers 继续。
+`superpowers-plan-assistant` 没有 helper 运行时依赖。
 
 ## 更新
 
