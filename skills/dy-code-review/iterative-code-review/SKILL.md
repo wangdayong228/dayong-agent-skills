@@ -13,7 +13,7 @@ The main agent remains accountable. Subagent feedback is evidence to evaluate, n
 
 **Core principles:**
 
-- **Context-first:** Subagents never inherit the main agent's session history. Before each review round, the main agent snapshots scope, diff, affected behavior, and prior-round raw facts into one **Review Context Pack** reused for all subagents in that round.
+- **Context-first:** Subagents never inherit the main agent's session history. Before each review round, the main agent snapshots scope, diff, optional affected behavior, and prior-round raw facts into one **Review Context Pack** reused for all subagents in that round.
 - **Parallel review:** Each round, the main agent reviews code **in the same turn** as subagent dispatch—read files, trace paths, record findings while subagent(s) run. Do not wait for subagent results before starting review.
 - **Default one subagent:** Dispatch **one** cost-effective readonly review subagent unless the user explicitly asks for multiple subagents (e.g. "多个子代理", "多模型 review", "multi-reviewer").
 - **Same-LLM skip:** Do **not** dispatch a subagent when it would use the **same LLM** as the main agent (same `model` identifier or equivalent backend). In that case, the main agent's parallel review is sufficient for that round—no redundant same-model subagent.
@@ -23,7 +23,6 @@ The main agent remains accountable. Subagent feedback is evidence to evaluate, n
 
 Before editing code, load the environment's relevant skills by capability:
 
-- `affected-path-review` when correctness may depend on code beyond changed lines.
 - `review-bugbot` on Cursor for the default review subagent.
 - `review-security` on Cursor when multi-subagent mode is active and changes touch security boundaries.
 - `dispatching-parallel-agents` for parallel main-agent review and subagent dispatch.
@@ -34,6 +33,26 @@ Before editing code, load the environment's relevant skills by capability:
 - Verification and consistency capability before claiming completion.
 
 If the request is about GitHub PR comments or review threads, use `fixing-pr-review-comments` first, then use this skill only for the local review loop.
+
+## Affected-Path Opt-In
+
+Do not load `affected-path-review` by default.
+
+Exception — load without asking when both are already true:
+
+- a Superpowers written Plan has completed every Task
+- this invocation is the whole-branch/final code review
+
+Otherwise, before round 1 snapshot, ask once:
+
+> 这次 iterative review 要不要使用 `affected-path-review`
+>（按完整行为路径审，而不是只看 diff）？默认不用。
+
+Wait for the answer. Do not start packing or dispatching until the user replies.
+
+- yes → load `affected-path-review` and fill `AffectedBehavior` in the pack
+- no / skip / 默认 → do not load it; leave `AffectedBehavior` empty
+- already answered this invocation → reuse; do not ask again in round 2/3
 
 ## Loop Contract
 
@@ -51,6 +70,7 @@ Run at most three rounds. Track this state explicitly:
 | `rejected` | Findings disproven, obsolete, duplicate, speculative, or out of scope |
 | `fixed` | Accepted findings fixed in this round |
 | `verification` | Tests, linters, builds, smoke checks, or manual evidence |
+| `affected_path` | `auto-final`, `opted-in`, or `skipped` |
 
 Stop early when a review round returns no actionable findings and verification passes. Stop after round 3 even if findings remain, and report unresolved items instead of starting round 4.
 
@@ -98,7 +118,7 @@ In multi-subagent mode, skip only the colliding slots; still dispatch remaining 
 
 In the same turn as subagent dispatch, the main agent independently:
 
-- Reviews using the packed scope, diff, and affected-path summary.
+- Reviews using the packed scope, diff, and affected-path summary when loaded.
 - Records findings in the standard format with `source: main-agent`.
 - Stays read-only during this step—no code edits yet.
 - Does **not** auto-accept its own findings; they enter merge and adjudication like any other source.
@@ -111,7 +131,7 @@ Dispatch subagent Task call(s) and main-agent read/trace tool calls in the **sam
    - Run the repo's normal status command, such as `git status --short --branch` when available.
    - Identify `ReviewScope`: unstaged changes, staged changes, branch changes, a PR diff, selected files, or all local changes.
    - Capture `git diff --stat` and the full diff, or a per-file change description when diff is unavailable.
-   - If `affected-path-review` applies, add the affected behavior and path summary.
+   - If the user opted in (or Superpowers final-review exception applies), add the affected behavior and path summary.
    - Add prior-round raw facts only: fixes made, tests run, rejected findings. Do not leak desired conclusions.
    - Fill one **Review Context Pack** (below) for subagent reuse.
    - Do not revert unrelated user changes.
@@ -185,6 +205,7 @@ Return: severity P0–P3, file:line/symbol, problem, why wrong, suggested verifi
 | "User didn't ask, but three reviewers is better." | Default to one subagent; multi-subagent requires explicit user request. |
 | "Use Codex high for review quality." | Use bugbot/readonly reviewers; implementation models for fixes only. |
 | "Let the subagent discover scope." | Pack Review Context Pack before dispatch. |
+| "Correctness may depend on code beyond the diff, so load affected-path-review." | Ask unless Superpowers final-review exception applies; default is off. |
 | "Consensus means auto-fix." | Consensus only raises priority; verify before accepting. |
 | "One clean review is enough after several fixes." | Enough only if verification also passes. |
 | "A third round found more issues, so continue." | Stop after round 3 and report remaining risks. |
@@ -199,6 +220,7 @@ Report:
 - Review rounds run and why the loop stopped.
 - Whether `multi_subagent_mode` was active.
 - Subagents dispatched (type + model), or same-LLM skip with `subagents: []`.
+- Whether `affected-path-review` was used (`auto-final` / `opted-in` / `skipped`).
 - Main-agent finding count vs subagent finding count, and consensus count after merge.
 - Findings accepted, rejected, already fixed, or requiring user decision.
 - Files changed by the main agent.
