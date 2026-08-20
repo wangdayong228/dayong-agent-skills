@@ -1,7 +1,6 @@
 ---
 name: analyze-current-changes
 description: Analyze current repository modifications and generate a Chinese introduction report. Use when the user asks to summarize local changes, explain what was modified, provide background context, or produce per-item code-oriented change descriptions with file references.
-disable-model-invocation: true
 ---
 
 # Analyze Current Changes
