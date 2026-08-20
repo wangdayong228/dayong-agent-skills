@@ -1,8 +1,8 @@
 ---
 name: superpowers-execution-timing
 description: >-
-  Use when an original Superpowers executor is already running a written Plan
-  and observable natural step timing should be recorded as sidecar data.
+  Use when starting or resuming execution of a written Plan
+  (executing-plans / subagent-driven-development).
 ---
 
 # Superpowers Execution Timing
