@@ -1,6 +1,12 @@
 ---
 name: consistency-check
-description: Use after verification-before-completion and before claiming work is done — cross-checks consistency across artifacts, sections, files, and configuration; catches contradictions that verification alone misses
+description: >-
+  Use after verification-before-completion when a Superpowers written Plan
+  has completed every Task and completion, commit, or a PR is about to be
+  claimed; or when a finished spec, plan, or other document is about to be
+  sent for user approval or review; or when the user explicitly asks to use
+  consistency-check. Do not use during Plan tasks, while a document is still
+  being drafted, or before verification-before-completion.
 ---
 
 # Consistency Check
@@ -22,9 +28,24 @@ NO COMPLETION CLAIM WITHOUT A COMPLETED CONSISTENCY CHECKLIST
 
 If you haven't output the checklist in this message, you haven't checked consistency. Period.
 
-## When To Apply
+## When to Use
 
-After `verification-before-completion` passes, BEFORE claiming work is done, committing, or creating a PR.
+Load only if one of these is true, and only after
+`verification-before-completion`:
+
+- Superpowers Plan has no remaining Tasks, and the next action is claiming
+  complete, committing, or opening a PR.
+- A spec, plan, or other document deliverable is finished on disk (written
+  and self-reviewed), and the next action is asking the user to approve or
+  review it.
+- The user explicitly asked to use consistency-check in this invocation.
+
+## When NOT to Use
+
+Do not load during Plan task execution, per-task completion claims,
+brainstorming or drafting before the document file exists, in-progress
+document edits, sidecar files not being sent for approval, or before
+verification-before-completion.
 
 ## The Consistency Gate
 

@@ -11,9 +11,9 @@
 
 | Skill | 默认触发场景 |
 | --- | --- |
-| `affected-path-review` | 任何 code review、PR review、review 子代理或 review comments 处理；将审查范围从 diff 扩展到完整行为路径 |
+| `affected-path-review` | Superpowers Plan 全部 Task 完成后的 final/whole-branch code review；其它审查默认不触发，除非用户明确要求（`iterative-code-review` 会询问） |
 | `fixing-pr-review-comments` | 获取并验证 GitHub PR review comments，修复确认的问题，并在授权后 push 与回复 thread |
-| `iterative-code-review` | 主代理与子代理并行审查本地改动（传 context、默认同 LLM 跳过子代理）；合并 findings 后循环修复直至通过 |
+| `iterative-code-review` | 主代理与子代理并行审查本地改动（传 context、默认同 LLM 跳过子代理）；是否启用 `affected-path-review` 会先询问（Superpowers final/whole-branch 例外） |
 | `strict-api-extraction` | 从官方 API 文档站完整采集原始素材（`pipeline/extract/raw/` + `pipeline/extract/snapshots/`）并产出 `pipeline/extract/report.md`；coverage 不足时继续抓取，禁止猜测未文档化的 schema 元素。**依赖：** 需单独安装 `ego-browser`；可选 `firecrawl-scrape` / `firecrawl-map` |
 | `openapi-from-sources` | 基于已有素材（含 strict-api-extraction 产出）校验是否足够生成 OpenAPI 3.x；strict NO-GO 时报告 4 个编号选项，用户选 example-fallback 后可从官方 example 生成带标注的 `pipeline/openapi/openapi.yaml`。**依赖：** 素材需已采集；下游可用 `api-client-generator` 或 `typed-sdk-from-openapi`（Go） |
 | `typed-sdk-from-openapi` | 输入可信且 pinned 的 OpenAPI 3.x 文档（优先 `pipeline/openapi/openapi.yaml`），先通过 preflight + 依赖检查，加载 `api-client-generator` 约束后先完成 retry policy 草案/审阅/确认 gate，再进入 Phase A/B 生成与封装，最终产出 2 层 Go SDK（`internal/generated/` + `pkg/client/`，`internal/transport/` 作为内部实现），并写入 `config/` 与 `tools/`；中间产物落到 `.sdkgen/`，NO-GO fail-fast 仅输出报告。**依赖：** `api-client-generator`；若存在 `retryable` 操作还需 `rate-limit-handler` |
@@ -23,6 +23,7 @@
 | `superpowers-decision-trace` | brainstorming/spec 修订期间复用相邻已确认决策；失败仅 warning |
 | `superpowers-plan-assistant` | writing-plans self-review 后筛出用户必须核实事项并提供技术/DAG findings；不形成门禁 |
 | `superpowers-execution-timing` | 原版 executor 开始后旁路记录自然 step 的真实耗时；不改变粒度或调度 |
+| `consistency-check` | 在 Superpowers `verification-before-completion` 之后触发：Plan 全部 Task 完成后且即将声称完成/commit/PR，或 spec/plan 等文档已写完且即将请用户批准或 review。执行中途与文档撰写过程中不触发。 |
 
 三个 V2 skill 独立安装、独立触发，互不调用；它们只提供旁路信息，不组成自动串联工作流，也不控制原版 Superpowers 是否继续。
 
@@ -32,7 +33,7 @@
 > - Go SDK：`generated/` → `internal/generated/`；元数据 `sdk/` → `config/`；`scripts/regen.sh` → `tools/regen.sh`
 > - 不再写入交付层 `schema/openapi.yaml` 副本；manifest 记录输入 spec 的 path + SHA256
 
-例外：若你明确要求 `diff-only review`，则只审查 diff，不会按 `affected-path-review` 扩展到完整行为路径。
+例外：仅当用户明确要求 `diff-only review` 时，即使已进入 affected-path-review，也只审查 diff。
 
 ## 仓库结构
 
@@ -76,6 +77,7 @@ npx skills add wangdayong228/dayong-agent-skills --skill codex-session-inspector
 npx skills add wangdayong228/dayong-agent-skills --skill superpowers-decision-trace -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill superpowers-plan-assistant -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill superpowers-execution-timing -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill consistency-check -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
@@ -97,6 +99,7 @@ npx skills add wangdayong228/dayong-agent-skills@codex-session-inspector -g -y
 npx skills add wangdayong228/dayong-agent-skills@superpowers-decision-trace -g -y
 npx skills add wangdayong228/dayong-agent-skills@superpowers-plan-assistant -g -y
 npx skills add wangdayong228/dayong-agent-skills@superpowers-execution-timing -g -y
+npx skills add wangdayong228/dayong-agent-skills@consistency-check -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
