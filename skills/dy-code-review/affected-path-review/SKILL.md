@@ -1,11 +1,11 @@
 ---
 name: affected-path-review
 description: >-
-  Use when a Superpowers written Plan has completed every Task and a
-  whole-branch/final code review is starting, or when the user explicitly
-  asks to use affected-path-review. Do not use for per-task, task-reviewer,
-  spec-compliance, plan/spec, or review-comment passes, iterative-code-review
-  by default, or any other review unless the user explicitly opted in.
+  Use only when the user explicitly asks to use affected-path-review or
+  explicitly asks for a full behavior-path review. Do not use for per-task,
+  task-reviewer, spec-compliance, plan/spec, or review-comment passes,
+  verification, finishing, or iterative-code-review unless the user opted in
+  during that invocation.
 ---
 
 # Affected Path Review
@@ -14,9 +14,8 @@ description: >-
 
 Load only if one of these is true:
 
-- Superpowers Plan has no remaining Tasks, and the next action is the
-  whole-branch/final code review.
-- The user explicitly asked to use affected-path-review in this invocation.
+- The user explicitly asked to use affected-path-review in this invocation, or explicitly asked for a full behavior-path review.
+- This invocation was already required by `global-conventions`. Do not restate the Plan or final-review condition here.
 
 ## When NOT to Use
 

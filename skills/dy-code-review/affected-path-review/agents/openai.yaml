@@ -1,4 +1,4 @@
 interface:
   display_name: "Affected Path Review"
   short_description: "Review affected behavior paths, not just changed lines."
-  default_prompt: "Use affected-path-review only after a Superpowers Plan has completed every Task and a whole-branch/final code review is starting, or when the user explicitly asks to use it."
+  default_prompt: "Use affected-path-review only when the user explicitly asks to use it or explicitly asks for a full behavior-path review."

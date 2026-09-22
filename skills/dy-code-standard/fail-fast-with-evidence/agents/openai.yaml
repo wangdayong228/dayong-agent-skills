@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fail-fast with Evidence"
+  short_description: "Errors must name the failed check and include this run's evidence."
+  default_prompt: "Use fail-fast-with-evidence when writing, editing, or reviewing errors so the operator can diagnose the failure from the error output alone."

@@ -1,12 +1,12 @@
 ---
 name: consistency-check
 description: >-
-  Use after verification-before-completion when a Superpowers written Plan
-  has completed every Task and completion, commit, or a PR is about to be
-  claimed; or when a finished spec, plan, or other document is about to be
+  Use when a Superpowers written Plan has completed every Task and
+  completion, commit, or a PR is about to be claimed; or when a finished
+  spec, plan, or other document is written, self-reviewed, and about to be
   sent for user approval or review; or when the user explicitly asks to use
   consistency-check. Do not use during Plan tasks, while a document is still
-  being drafted, or before verification-before-completion.
+  being drafted, or before the document file exists.
 ---
 
 # Consistency Check
@@ -30,22 +30,21 @@ If you haven't output the checklist in this message, you haven't checked consist
 
 ## When to Use
 
-Load only if one of these is true, and only after
-`verification-before-completion`:
+Load only if one of these is true:
 
 - Superpowers Plan has no remaining Tasks, and the next action is claiming
-  complete, committing, or opening a PR.
+  complete, committing, or opening a PR. Reuse verification evidence already
+  produced during execution. Do not re-run the verification chain.
 - A spec, plan, or other document deliverable is finished on disk (written
   and self-reviewed), and the next action is asking the user to approve or
-  review it.
+  review it. Do not require `verification-before-completion` first.
 - The user explicitly asked to use consistency-check in this invocation.
 
 ## When NOT to Use
 
 Do not load during Plan task execution, per-task completion claims,
 brainstorming or drafting before the document file exists, in-progress
-document edits, sidecar files not being sent for approval, or before
-verification-before-completion.
+document edits, or sidecar files not being sent for approval.
 
 ## The Consistency Gate
 
@@ -190,4 +189,9 @@ Verification catches broken code. Consistency catches broken promises:
 `verification-before-completion` answers: "Does it work?"
 `consistency-check` answers: "Does it agree with itself and everything around it?"
 
-Both must pass. Run verification first, then consistency. The consistency checklist is the final gate before any completion claim.
+Verification stays with Superpowers: plan-specified checks, `finishing-a-development-branch`, and `verification-before-completion`'s own trigger. This skill does not re-run that chain.
+
+- Plan completion: use verification evidence already produced, then run this checklist.
+- Document approval: run this checklist after the document is written and self-reviewed. Do not require a verification command first.
+
+The consistency checklist is the gate this skill adds before a completion claim or a request for approval.
