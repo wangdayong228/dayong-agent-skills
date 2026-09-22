@@ -11,6 +11,7 @@
 
 | Skill | 默认触发场景 |
 | --- | --- |
+| `global-conventions` | 会话开始时加载：强制技能触发表、Superpowers 中文文档、Plan 边界、正确性优先与记忆约定。Plan 收尾 / 文档送审默认要求 `consistency-check`；final/whole-branch review 默认要求 `affected-path-review`；编写或审查错误信息默认要求 `fail-fast-with-evidence`。无设计选择空间时可跳过 brainstorming。 |
 | `affected-path-review` | description 仅在用户点名或明确要求按完整行为路径审时匹配。Plan 全部完成后的 final review 默认要求见 `global-conventions`。 |
 | `fixing-pr-review-comments` | 获取并验证 GitHub PR review comments，修复确认的问题，并在授权后 push 与回复 thread |
 | `iterative-code-review` | 主代理与子代理并行审查本地改动（传 context、默认同 LLM 跳过子代理）；是否启用 `affected-path-review` 会先询问（Superpowers final/whole-branch 例外） |
@@ -23,8 +24,9 @@
 | `superpowers-decision-trace` | brainstorming/spec 修订期间复用相邻已确认决策；失败仅 warning |
 | `superpowers-plan-assistant` | writing-plans self-review 后筛出用户必须核实事项并提供技术/DAG findings；不形成门禁 |
 | `superpowers-execution-timing` | 原版 executor 开始后旁路记录自然 step 的真实耗时；不改变粒度或调度 |
-| `consistency-check` | Plan 全部 Task 完成后且即将声称完成/commit/PR，或 spec/plan 等文档已写完并自检、即将请用户批准或 review。沿用已有验证结果，不重跑验证链；文档送审不要求先跑 verification。执行中途与文档撰写过程中不触发。 |
-| `fail-fast-with-evidence` | 编写、修改或审查任何语言的错误信息时：先写明失败的检查，并带上这次运行的证据；不得用一句固定的笼统包装替换具体错误。 |
+| `consistency-check` | Plan 全部 Task 完成后且即将声称完成/commit/PR，或 spec/plan 等文档已写完并自检、即将请用户批准或 review。沿用已有验证结果，不重跑验证链；文档送审不要求先跑 verification。执行中途与文档撰写过程中不触发。默认要求见 `global-conventions`。 |
+| `fail-fast-with-evidence` | 编写、修改或审查任何语言的错误信息时：先写明失败的检查，并带上这次运行的证据；不得用一句固定的笼统包装替换具体错误。默认要求见 `global-conventions`。 |
+| `gin-request-error-log` | Gin 服务使用 rainbow-goutils，且 HTTP 失败需要打日志时：错误必须走 `ginutils.RenderError` / `RenderResponse`，由 `ApiLogMiddleware` 读取 `c.Errors` 打印。禁止业务失败主路径使用 `c.JSON` 或单独 `GinError.Render`。 |
 
 三个 V2 skill 独立安装、独立触发，互不调用；它们只提供旁路信息，不组成自动串联工作流，也不控制原版 Superpowers 是否继续。
 
@@ -47,7 +49,7 @@ skills/
         openai.yaml
 ```
 
-同一 category 下放置职责相关的 skills（如 `dy-code-standard/`、`dy-code-review/`、`dy-api-extraction/`、`dy-workflow/`、`dy-tools/`）。新增独立职责域时再建 category；否则放入已有 category。
+同一 category 下放置职责相关的 skills（如 `dy-code-standard/`、`dy-code-review/`、`dy-api-extraction/`、`dy-workflow/`、`dy-tools/`、`dy-go/`）。新增独立职责域时再建 category；否则放入已有 category。
 
 `agents/openai.yaml` 为可选元数据文件；跨代理场景优先读取 `SKILL.md`。
 
@@ -66,6 +68,7 @@ npx skills add wangdayong228/dayong-agent-skills --all -g -y
 **安装单个 skill（`--skill` 写法）：**
 
 ```bash
+npx skills add wangdayong228/dayong-agent-skills --skill global-conventions -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill affected-path-review -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill fixing-pr-review-comments -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill iterative-code-review -g -y
@@ -80,6 +83,7 @@ npx skills add wangdayong228/dayong-agent-skills --skill superpowers-plan-assist
 npx skills add wangdayong228/dayong-agent-skills --skill superpowers-execution-timing -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill fail-fast-with-evidence -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill gin-request-error-log -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
@@ -89,6 +93,7 @@ npx skills add wangdayong228/dayong-agent-skills --skill fail-fast-with-evidence
 **安装单个 skill（`@` 简写）：**
 
 ```bash
+npx skills add wangdayong228/dayong-agent-skills@global-conventions -g -y
 npx skills add wangdayong228/dayong-agent-skills@affected-path-review -g -y
 npx skills add wangdayong228/dayong-agent-skills@fixing-pr-review-comments -g -y
 npx skills add wangdayong228/dayong-agent-skills@iterative-code-review -g -y
@@ -103,6 +108,7 @@ npx skills add wangdayong228/dayong-agent-skills@superpowers-plan-assistant -g -
 npx skills add wangdayong228/dayong-agent-skills@superpowers-execution-timing -g -y
 npx skills add wangdayong228/dayong-agent-skills@consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills@fail-fast-with-evidence -g -y
+npx skills add wangdayong228/dayong-agent-skills@gin-request-error-log -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
