@@ -1,4 +1,0 @@
-interface:
-  display_name: "Gin Request Error Log"
-  short_description: "Log failed Gin requests through rainbow-goutils RenderError and ApiLogMiddleware."
-  default_prompt: "Use gin-request-error-log when a Gin service uses rainbow-goutils so HTTP failures go through ginutils.RenderError and are logged by ApiLogMiddleware."

@@ -26,7 +26,7 @@
 | `superpowers-execution-timing` | 原版 executor 开始后旁路记录自然 step 的真实耗时；不改变粒度或调度 |
 | `consistency-check` | Plan 全部 Task 完成后且即将声称完成/commit/PR，或 spec/plan 等文档已写完并自检、即将请用户批准或 review。沿用已有验证结果，不重跑验证链；文档送审不要求先跑 verification。执行中途与文档撰写过程中不触发。默认要求见 `global-conventions`。 |
 | `fail-fast-with-evidence` | 编写、修改或审查任何语言的错误信息时：先写明失败的检查，并带上这次运行的证据；不得用一句固定的笼统包装替换具体错误。默认要求见 `global-conventions`。 |
-| `gin-request-error-log` | Gin 服务使用 rainbow-goutils，且 HTTP 失败需要打日志时：错误必须走 `ginutils.RenderError` / `RenderResponse`，由 `ApiLogMiddleware` 读取 `c.Errors` 打印。禁止业务失败主路径使用 `c.JSON` 或单独 `GinError.Render`。 |
+| `logrus-http-response` | Go 服务使用 logrus 与 rainbow-goutils 打日志时：初始化、级别、业务日志，以及 Gin 请求日志。服务已使用 `ginutils` 且任务在改 HTTP 错误响应时，失败走 `RenderError` / `RenderResponse`，不用 `c.JSON` 或单独 `GinError.Render`。只加日志时不改响应。 |
 
 三个 V2 skill 独立安装、独立触发，互不调用；它们只提供旁路信息，不组成自动串联工作流，也不控制原版 Superpowers 是否继续。
 
@@ -83,7 +83,7 @@ npx skills add wangdayong228/dayong-agent-skills --skill superpowers-plan-assist
 npx skills add wangdayong228/dayong-agent-skills --skill superpowers-execution-timing -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill fail-fast-with-evidence -g -y
-npx skills add wangdayong228/dayong-agent-skills --skill gin-request-error-log -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill logrus-http-response -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
@@ -108,7 +108,7 @@ npx skills add wangdayong228/dayong-agent-skills@superpowers-plan-assistant -g -
 npx skills add wangdayong228/dayong-agent-skills@superpowers-execution-timing -g -y
 npx skills add wangdayong228/dayong-agent-skills@consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills@fail-fast-with-evidence -g -y
-npx skills add wangdayong228/dayong-agent-skills@gin-request-error-log -g -y
+npx skills add wangdayong228/dayong-agent-skills@logrus-http-response -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）

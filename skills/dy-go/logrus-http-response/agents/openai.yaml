@@ -1,0 +1,4 @@
+interface:
+  display_name: "Logrus HTTP Response"
+  short_description: "Log with logrus and rainbow-goutils; HTTP errors go through ginutils.RenderError only when that service already uses it."
+  default_prompt: "Use logrus-http-response for logrus and rainbow-goutils logging. Change HTTP error responses to ginutils.RenderError only when the service already uses ginutils and the task is changing those responses."
