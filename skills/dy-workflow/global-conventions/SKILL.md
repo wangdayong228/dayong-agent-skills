@@ -30,6 +30,7 @@ description: Use when starting any conversation — establishes mandatory skill 
 | Superpowers Plan 全部 Task 完成后的 final/whole-branch code review | `affected-path-review` | per-task / task-reviewer / plan/spec review / review comments / 验证链 / finishing / 未 opt-in 的 iterative-code-review |
 | 编写、修改或审查代码中的错误/异常/失败信息 | `fail-fast-with-evidence` | 未触及错误信息的改动；已写清失败点与实际值的既有错误、仅为统一形式而改写 |
 | 使用 Go 设计或实现后端 HTTP 服务 | `logrus-http-response` | |
+| Go Gin REST API 编写、修改或同步 Swagger 2.0 / swag 文档 | `gin-swagger` | 上游 OpenAPI 副本与 codegen 客户端；`openapi-from-sources` / `typed-sdk-from-openapi`；非 Gin / 非 swaggo |
 
 验证仍走 Superpowers 原有步骤（计划内验证、`finishing-a-development-branch`，以及 `verification-before-completion` 自身的触发）。这张表不取消验证，也不再强制重跑 `pre-verification-check` → `verification-before-completion`。Plan 收尾时沿用已有验证结果再做 `consistency-check`；文档送审时写完并自检后直接做 `consistency-check`。
 

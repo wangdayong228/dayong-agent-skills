@@ -27,6 +27,7 @@
 | `consistency-check` | Plan 全部 Task 完成后且即将声称完成/commit/PR，或 spec/plan 等文档已写完并自检、即将请用户批准或 review。沿用已有验证结果，不重跑验证链；文档送审不要求先跑 verification。执行中途与文档撰写过程中不触发。默认要求见 `global-conventions`。 |
 | `fail-fast-with-evidence` | 编写、修改或审查任何语言的错误信息时：先写明失败的检查，并带上这次运行的证据；不得用一句固定的笼统包装替换具体错误。默认要求见 `global-conventions`。 |
 | `logrus-http-response` | Go 服务使用 logrus 与 rainbow-goutils 打日志时：初始化、级别、业务日志，以及 Gin 请求日志。新 handler 的成功走 `RenderSuccess`（HTTP 200 加业务对象）；失败走 `RenderError` / `RenderResponse`。已有 handler 只在任务是改错误响应时改失败分支。只加日志时不改响应、不替换中间件链。不管报警。 |
+| `gin-swagger` | Go Gin 服务需要 Swagger 2.0 文档、swaggo handler 注解、`swag init`、gin-swagger UI、DTO `swaggertype`，或生成文档与接口漂移时。 |
 
 三个 V2 skill 独立安装、独立触发，互不调用；它们只提供旁路信息，不组成自动串联工作流，也不控制原版 Superpowers 是否继续。
 
@@ -84,6 +85,7 @@ npx skills add wangdayong228/dayong-agent-skills --skill superpowers-execution-t
 npx skills add wangdayong228/dayong-agent-skills --skill consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill fail-fast-with-evidence -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill logrus-http-response -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill gin-swagger -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）
@@ -109,6 +111,7 @@ npx skills add wangdayong228/dayong-agent-skills@superpowers-execution-timing -g
 npx skills add wangdayong228/dayong-agent-skills@consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills@fail-fast-with-evidence -g -y
 npx skills add wangdayong228/dayong-agent-skills@logrus-http-response -g -y
+npx skills add wangdayong228/dayong-agent-skills@gin-swagger -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
 # typed-sdk-from-openapi 依赖 api-client-generator 能力（需在运行环境中可用）
 # 若存在 retryable / idempotent_key_required 操作，还需 rate-limit-handler（backoff）

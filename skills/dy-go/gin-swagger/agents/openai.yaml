@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gin Swagger"
+  short_description: "Add swaggo Swagger 2.0 annotations, swag init, and non-prod gin-swagger UI for a Go Gin HTTP API."
+  default_prompt: "Use gin-swagger when adding or completing Swagger 2.0 docs for a Go Gin service. Keep handler comments and DTO swaggertype as the source, generate docs.go with swag init --parseDependency, and register gin-swagger only outside production."
