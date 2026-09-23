@@ -18,7 +18,7 @@ description: >-
 | 业务日志 | 业务代码调用全局 `logrus` | 按事件写一条，带 `[Component]` 和 Fields |
 | 请求日志 | `ApiLogMiddleware` | 每个请求结束写一条 `Info("[ApiLogMiddleware] Request")` |
 | 失败出现在请求日志里 | `RenderError` / `RenderResponse` 写入 `c.Errors` 和 `error_stack` | Handler 不再为同一次失败另写一条请求错误日志 |
-| Panic | `Recovery` | 写一条 `logrus.Error`，并对客户端返回统一错误体 |
+| Panic | `pkgmiddlewares.Recovery()` | 使用这份中间件，不要重写 |
 | 报警 | 不属于本系统 | 不随日志改动一起加 |
 
 请求日志能看见失败，是因为错误响应写进了 `c.Errors`，不是因为多打了一条 handler 日志。成功响应不写 `c.Errors`。
@@ -57,9 +57,11 @@ log:
 ## 怎么打
 
 ```go
-logrus.WithError(err).
-    WithField("order_id", orderID).
-    Info("[CardService] open card completed")
+// 成功
+logrus.WithField("order_id", orderID).Info("[CardService] open card completed")
+
+// 失败
+logrus.WithError(err).WithField("order_id", orderID).Error("[CardService] open card failed")
 ```
 
 - 消息以 `[Component]` 开头，写清做了什么；ID、金额、状态放 Fields，错误用 `WithError`。
@@ -85,7 +87,7 @@ engine.Use(pkgmiddlewares.Recovery())
 
 `bodyIgnoredPaths` 与请求 URL 精确匹配，大小写不敏感，不是路由模板。`/v1/files/kyc/*filepath` 不会命中真实路径。登录、上传、证件用真实路径。Query 会拼进 `path`；token 在 query 里时，忽略 body 也挡不住。
 
-Panic 由 `Recovery` 记 `logrus.Error`，并对客户端返回统一错误体。
+Panic 使用上面的 `pkgmiddlewares.Recovery()`，不要自己重写恢复中间件。
 
 ## 成功响应
 
@@ -141,4 +143,4 @@ func OpenCard(c *gin.Context) {
 
 新 handler：成功是 HTTP 200 加业务对象；`*GinError` 的失败响应是 `{code, message, data}`，且同一条请求日志含 `errors`。普通 `error` 才是业务码 `100`、HTTP `599`。
 
-改已有 HTTP 错误响应时：只改失败分支。成功响应仍是原来的业务对象。`*GinError` 的 HTTP 状态未变成 599。Panic 有 recovery 日志和统一错误体。
+改已有 HTTP 错误响应时：只改失败分支。成功响应仍是原来的业务对象。`*GinError` 的 HTTP 状态未变成 599。Panic 走 `pkgmiddlewares.Recovery()`，没有另写的恢复中间件。
