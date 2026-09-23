@@ -9,24 +9,42 @@ description: >-
 
 # logrus 与 HTTP 响应
 
-业务日志用全局 `logrus`。初始化、按日文件、控制台双写、请求日志和 panic 恢复都走 `rainbow-goutils`。
+## 日志系统
 
-请求失败日志依赖错误响应路径：只有 `ginutils.RenderError` / `RenderResponse` 会写入 `c.Errors` 和 `error_stack`，`ApiLogMiddleware` 才能打出 `errors`。两条规则分开适用：
+一套全局 `logrus`。`logger.Init` 之后，业务日志、请求日志和 panic 都进同一条输出：按日文件，并双写彩色控制台。`Init` 之前的调用不进这套输出。
 
-- 当前任务只加业务日志时，不改现有 HTTP 响应。
-- 当前任务只改 HTTP 错误响应时，不新增 `logger.Init`、日志级别或业务日志格式。
-- HTTP 错误响应规则只在该服务已经使用 `ginutils` 时适用。
+| 部分 | 谁写 | 结果 |
+|------|------|------|
+| 业务日志 | 业务代码调用全局 `logrus` | 按事件写一条，带 `[Component]` 和 Fields |
+| 请求日志 | `ApiLogMiddleware` | 每个请求结束写一条 `Info("[ApiLogMiddleware] Request")` |
+| 失败出现在请求日志里 | `RenderError` / `RenderResponse` 写入 `c.Errors` 和 `error_stack` | Handler 不再为同一次失败另写一条请求错误日志 |
+| Panic | `Recovery` | 写一条 `logrus.Error`，并对客户端返回统一错误体 |
+| 报警 | 不属于本系统 | 不随日志改动一起加 |
+
+请求日志能看见失败，是因为错误响应写进了 `c.Errors`，不是因为多打了一条 handler 日志。成功响应不写 `c.Errors`。
+
+业务事件由业务代码写，请求日志由中间件写：
+
+```go
+logrus.WithField("order_id", orderID).Info("[CardService] open card completed")
+```
+
+按任务适用：
+
+- 当前任务只加业务日志时，不改现有 HTTP 响应，不替换现有中间件链。
+- 当前任务只改 HTTP 错误响应时，不新增 `logger.Init`、日志级别或业务日志格式，也不改成功响应。
+- 成功响应和 HTTP 错误响应的写法只在该服务已经使用 `ginutils` 时适用。
+- 本 skill 不管报警。改日志或错误响应时不要顺手加 `DingError`。`ErrUnexpected` 要报警是另一套规则。
 
 ## 依赖
 
 - `github.com/sirupsen/logrus`
 - `github.com/gin-gonic/gin`
 - `github.com/nft-rainbow/rainbow-goutils` 的 `logger`、`middlewares`、`utils/ginutils`
-- `github.com/pkg/errors`
 
 ## 初始化
 
-启动时、业务开始前调用 `logger.Init(logConfig)`。
+业务开始前调用 `logger.Init(logConfig)`。在此之前的 `logrus` 调用不会进入按日文件，也不会走彩色控制台。
 
 ```yaml
 log:
@@ -45,51 +63,82 @@ logrus.WithError(err).
 ```
 
 - 消息以 `[Component]` 开头，写清做了什么；ID、金额、状态放 Fields，错误用 `WithError`。
-- **Debug**：高频内部细节、外部请求原文。**Info**：启停、一轮任务、正常业务结果。可预期的本轮失败也可以是 Info + `WithError`。**Warn**：已兜底的异常。**Error**：必须关注的失败。
-- 按业务事件打，不要每个函数入口都打。Controller 不重复打请求日志。
+- **Debug**：高频内部细节。外部请求原文仅在不含密钥、证件、ticket 时使用。**Info**：启停、一轮任务、正常业务结果。后台任务本轮失败且还会重试时，可以用 Info + `WithError`。**Warn**：已兜底、调用仍继续。**Error**：必须有人看的失败。
+- 余额不足、超过限额这类预期用户错误，HTTP 层已经记下时，service 不再打一条。
+- 按业务事件打，不要每个函数入口都打。Controller 可以打业务判断；不要再打一条与访问日志重复的请求日志。
 - 不记密码、私钥、完整 captcha ticket、证件与登录 body。
 
-GORM 使用 `logrus.StandardLogger().WriterLevel(logrus.WarnLevel)`，只记 Warn 与慢查询，并使用参数化 SQL。
+接入 GORM logger 时，用 `logrus.StandardLogger().WriterLevel(logrus.WarnLevel)`，只记 Warn 与慢查询，并使用参数化 SQL。
 
 ## Gin 请求日志
 
-`gin.New()`，顺序固定：
+把下面两行加在现有中间件之前。不要用它们替换整条链，CORS 和鉴权保持不动。
 
 ```go
-engine.Use(gin.Logger())
 engine.Use(pkgmiddlewares.ApiLogMiddleware(bodyIgnoredPaths))
 engine.Use(pkgmiddlewares.Recovery())
 ```
 
-`ApiLogMiddleware` 在请求结束后打一条 `Info("[ApiLogMiddleware] Request")`。忽略列表中的路径，以及 body ≥ 5KB，不记录 body。有 `c.Errors` 时带上 `errors` 和 `error_stack`。
+错误能进 ApiLog，是因为 `RenderError` 写了 `c.Errors`，不是因为 `gin.Logger()`。`gin.Logger()` 与 `ApiLogMiddleware` 同时使用会各打一遍访问日志。
 
-`bodyIgnoredPaths` 放登录、上传、证件等不能记 body 的路径。Panic 由 `Recovery` 记 `logrus.Error`，并对客户端返回统一错误体。
+`ApiLogMiddleware` 在请求结束后打一条 `Info("[ApiLogMiddleware] Request")`。有 `c.Errors` 时带上 `errors` 和 `error_stack`。`ContentLength` ≥ 5KB 不记录 body；`ContentLength` 未知（-1）时仍会读取 body。
+
+`bodyIgnoredPaths` 与请求 URL 精确匹配，大小写不敏感，不是路由模板。`/v1/files/kyc/*filepath` 不会命中真实路径。登录、上传、证件用真实路径。Query 会拼进 `path`；token 在 query 里时，忽略 body 也挡不住。
+
+Panic 由 `Recovery` 记 `logrus.Error`，并对客户端返回统一错误体。
+
+## 成功响应
+
+新 handler，且服务已经使用 `ginutils` 时，成功走 `RenderSuccess(c, obj)` 或 `RenderResponse(c, obj, nil)`。这是 HTTP 200 加业务对象。`obj` 为 `nil` 时响应是 `{}`。成功不写 `c.Errors`，也不包进 `{code, message, data}`。
+
+已有 handler 的成功响应保持原样。
 
 ## HTTP 错误响应
 
-服务已经使用 `ginutils`，且当前任务在改 HTTP 错误响应时，失败只走：
+服务已经使用 `ginutils`，且当前任务在改 HTTP 错误响应时，只改失败分支：
 
 ```go
-ginutils.RenderResponse(c, resp, err)
-// 或
 ginutils.RenderError(c, err)
+// 或
+ginutils.RenderResponse(c, nil, err)
 ```
 
-`RenderError` 会 `c.Error(err)` 并写入 `error_stack`。业务错误用 `*ginutils.GinError`。普通 `error` 会变成 code `100`。成功与失败响应体都是 `{code, message, data}`。
+`RenderError` 会 `c.Error(err)` 并写入 `error_stack`。业务错误用 `*ginutils.GinError`，响应体是 `{code, message, data}`，HTTP 状态来自该 `GinError`。不是 `*GinError` 的错误会变成业务码 `100`、HTTP `599`。
 
-业务失败主路径不用 `c.JSON(4xx/5xx, ...)`。也不只调用 `someGinError.Render(c)`：它只写 JSON，不调用 `c.Error`，日志里没有 `errors` / `stack`。
+业务失败主路径不用 `c.JSON(4xx/5xx, ...)`。也不只调用 `someGinError.Render(c)`：它只写 JSON，不调用 `c.Error`，日志里没有 `errors` / `stack`。不要把 `err.Error()` 放进响应 `data`。同一次失败不要再写 `logrus.Error`。
+
+`fmt.Errorf("%w", ginErr)` 经 `pkg/errors.Cause` 解不开，会掉成业务码 `100`、HTTP `599`。要保住业务码，`Cause()` 必须仍是 `*GinError`（例如 `pkg/errors.Wrap`）。
 
 ```go
-// 错误
+// 错误：只写 JSON，不进 ApiLog，并把内部错误放进响应
 bimerrors.ErrInvalidInput.WithData(err.Error()).Render(c)
 // 正确
-ginutils.RenderError(c, bimerrors.ErrInvalidInput.WithData(err.Error()))
+ginutils.RenderError(c, bimerrors.ErrInvalidInput)
 ```
 
-Handler 不另写一套请求错误日志。
+下面这段只用于新 handler。已有 handler 只在任务是改错误响应时改失败分支，成功分支不动。
+
+```go
+func OpenCard(c *gin.Context) {
+    if err := c.ShouldBindJSON(&req); err != nil {
+        ginutils.RenderError(c, bimerrors.ErrInvalidInput)
+        return
+    }
+    orderID, err := service.OpenCard(req)
+    if err != nil {
+        ginutils.RenderError(c, err)
+        return
+    }
+    ginutils.RenderSuccess(c, gin.H{"orderID": orderID})
+}
+```
+
+绑定失败和 `OpenCard` 失败都会出现在 `[ApiLogMiddleware] Request` 的 `errors` 里。`order_id` 那条业务日志不是请求日志。
 
 ## 验收
 
-加请求日志时：有 `[ApiLogMiddleware] Request`；登录或上传路径的日志中没有 body。
+加请求日志时：有 `[ApiLogMiddleware] Request`；登录或上传的真实路径日志中没有 body；现有中间件、成功响应和失败响应都不变。
 
-改 HTTP 错误响应时：一次 `RenderError` 的响应为 `{code, message, data}`，同一条请求日志含 `errors`。Panic 有 recovery 日志和统一错误体。
+新 handler：成功是 HTTP 200 加业务对象；`*GinError` 的失败响应是 `{code, message, data}`，且同一条请求日志含 `errors`。普通 `error` 才是业务码 `100`、HTTP `599`。
+
+改已有 HTTP 错误响应时：只改失败分支。成功响应仍是原来的业务对象。`*GinError` 的 HTTP 状态未变成 599。Panic 有 recovery 日志和统一错误体。
