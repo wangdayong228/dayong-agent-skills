@@ -11,7 +11,7 @@
 
 | Skill | 默认触发场景 |
 | --- | --- |
-| `global-conventions` | 会话开始时加载：强制技能触发表、Superpowers 中文文档、Plan 边界、正确性优先与记忆约定。Plan 收尾 / 文档送审默认要求 `consistency-check`；final/whole-branch review 默认要求 `affected-path-review`；编写或审查错误信息默认要求 `fail-fast-with-evidence`。无设计选择空间时可跳过 brainstorming。 |
+| `global-conventions` | 会话开始时加载：强制技能触发表、Superpowers 中文文档、Plan 边界、正确性优先与记忆约定。Plan 收尾 / 文档送审默认要求 `consistency-check`；final/whole-branch review 默认要求 `affected-path-review`；编写或审查错误信息默认要求 `fail-fast-with-evidence`；使用 Go 设计或实现后端 HTTP 服务默认要求 `logrus-http-response`。无设计选择空间时可跳过 brainstorming。 |
 | `affected-path-review` | description 仅在用户点名或明确要求按完整行为路径审时匹配。Plan 全部完成后的 final review 默认要求见 `global-conventions`。 |
 | `fixing-pr-review-comments` | 获取并验证 GitHub PR review comments，修复确认的问题，并在授权后 push 与回复 thread |
 | `iterative-code-review` | 主代理与子代理并行审查本地改动（传 context、默认同 LLM 跳过子代理）；是否启用 `affected-path-review` 会先询问（Superpowers final/whole-branch 例外） |
