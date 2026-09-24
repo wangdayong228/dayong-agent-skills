@@ -2,9 +2,9 @@
 name: logrus-http-response
 description: >-
   Use when a Go service logs with logrus and rainbow-goutils, including
-  logger.Init, log levels, Gin ApiLogMiddleware, or when handlers return
-  errors with c.JSON, GinError.Render, or a local logger instead of
-  ginutils.RenderError.
+  logger.Init, log levels, Gin ApiLogMiddleware, when defining a GinError
+  body code or HTTP status, or when handlers return errors with c.JSON,
+  GinError.Render, or a local logger instead of ginutils.RenderError.
 ---
 
 # logrus 与 HTTP 响应
@@ -105,7 +105,7 @@ ginutils.RenderError(c, err)
 ginutils.RenderResponse(c, nil, err)
 ```
 
-`RenderError` 会 `c.Error(err)` 并写入 `error_stack`。业务错误用 `*ginutils.GinError`，响应体是 `{code, message, data}`，HTTP 状态来自该 `GinError`。不是 `*GinError` 的错误会变成业务码 `100`、HTTP `599`。
+`RenderError` 会 `c.Error(err)` 并写入 `error_stack`。公开错误的 HTTP 状态和 body `code` 见「错误码」。
 
 业务失败主路径不用 `c.JSON(4xx/5xx, ...)`。也不只调用 `someGinError.Render(c)`：它只写 JSON，不调用 `c.Error`，日志里没有 `errors` / `stack`。不要把 `err.Error()` 放进响应 `data`。同一次失败不要再写 `logrus.Error`。
 
@@ -136,6 +136,37 @@ func OpenCard(c *gin.Context) {
 ```
 
 绑定失败和 `OpenCard` 失败都会出现在 `[ApiLogMiddleware] Request` 的 `errors` 里。`order_id` 那条业务日志不是请求日志。
+
+## 错误码
+
+公开错误是 `*ginutils.GinError`，响应体为 `{code, message, data}`。调用方看 body `code`。body `code` 取 200 以内或 600 以外，并且不要用 `100`。
+
+- `NewBusinessGinError(code, message)`：HTTP 599
+- `NewBadRequestGinError(code, message)`：HTTP 400
+- `NewConflictGinError(code, message)`：HTTP 409
+
+一个场景只用一个整数。公开错误定义在同一个包里，handler 只引用这些变量，不在 handler 里新造一个公开错误。`WithMessage` 只追加文案，不改 `code` 和 HTTP 状态。需要其他 HTTP 状态时用 `NewGinError(status, code, message)`，body `code` 仍然避开 `200`–`600`。
+
+```go
+// errors/errors.go
+var ErrNotEnoughBalance = ginutils.NewBusinessGinError(120, "insufficient balance")
+
+var ErrLockedBalanceNotEnough = ErrNotEnoughBalance.WithMessage("locked balance is not enough")
+```
+
+```go
+// handler
+if err != nil {
+    ginutils.RenderError(c, errors.ErrLockedBalanceNotEnough)
+    return
+}
+```
+
+`120` 只分配一次。`ErrLockedBalanceNotEnough` 仍是 HTTP 599、body `code` 120。
+
+不是 `*GinError` 的错误经 `RenderError` 变成 body `code` `100`、HTTP `599`，`message` 为 `err.Error()`。
+
+Gin 或中间件已经写完的响应保持原样，不要改成 `GinError`。路由未命中是 Gin 的 404。`gin-jwt` 未认证沿用回调给出的 HTTP 401 和它自己的响应体 `{code, message}`。
 
 ## 验收
 
