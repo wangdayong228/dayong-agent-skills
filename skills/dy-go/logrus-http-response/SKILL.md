@@ -91,7 +91,7 @@ Panic 使用上面的 `pkgmiddlewares.Recovery()`，不要自己重写恢复中�
 
 ## 成功响应
 
-新 handler，且服务已经使用 `ginutils` 时，成功走 `RenderSuccess(c, obj)` 或 `RenderResponse(c, obj, nil)`。这是 HTTP 200 加业务对象。`obj` 为 `nil` 时响应是 `{}`。成功不写 `c.Errors`，也不包进 `{code, message, data}`。
+新 handler，且服务已经使用 `ginutils` 时，成功走 `RenderSuccess(c, obj)` 或 `RenderResponse(c, obj, nil)`。创建、更新、删除、异步受理和幂等重放都是 HTTP 200 加业务对象。同一把幂等键、同一份参数的重放返回同一份业务对象，不用 `201` 或 `202` 区分是否第一次创建。`obj` 为 `nil` 时响应是 `{}`。成功不写 `c.Errors`，也不包进 `{code, message, data}`。
 
 已有 handler 的成功响应保持原样。
 
@@ -145,7 +145,15 @@ func OpenCard(c *gin.Context) {
 - `NewBadRequestGinError(code, message)`：HTTP 400
 - `NewConflictGinError(code, message)`：HTTP 409
 
-一个场景只用一个整数。公开错误定义在同一个包里，handler 只引用这些变量，不在 handler 里新造一个公开错误。`WithMessage` 只追加文案，不改 `code` 和 HTTP 状态。需要其他 HTTP 状态时用 `NewGinError(status, code, message)`，body `code` 仍然避开 `200`–`600`。
+一个场景只用一个整数。公开错误定义在同一个包里，handler 只引用这些变量，不在 handler 里新造一个公开错误。`WithMessage` 只追加文案，不改 `code` 和 HTTP 状态。
+
+应用只使用这些 HTTP 状态：成功 `200`；参数或校验失败 `400`（`NewBadRequestGinError`）；未认证 `401`（`NewGinError`）；不存在 `404`（`NewGinError`，方法不允许也用 404）；冲突 `409`（`NewConflictGinError`）；应用判定的服务端失败 `599`（`NewBusinessGinError`，或 `NewGinError(599, code, message)`）。
+
+应用不返回 `201`、`202`、`403`、`405`、`422`、`429`，也不返回 `500`、`502`、`503`、`504`。这些 `5xx` 只留给网关、反向代理和负载均衡。已知还是未知看 body `code`：完整性、依赖失败、暂时不可用、健康检查失败、关停中都是 HTTP `599` 加各自的业务码；未分类内部错误才是 HTTP `599` 加通用内部码。网关不要按 `599` 自动重试。
+
+`NewGinError` 的 status 只能是 `401`、`404` 或 `599`。body `code` 仍然避开 `200`–`600`，并且不要用 `100`。
+
+上述 HTTP 状态用于新 handler。已有响应是否改成这组状态，先问用户。用户明确要求按该白名单调整时才改；未说明则保持原状态，不要把 `201` / `202` 收成 `200`，不要把 `405` 收成 `404`，也不要把 `500` / `502` / `503` / `504` 收成 `599`。
 
 ```go
 // errors/errors.go
@@ -166,7 +174,7 @@ if err != nil {
 
 不是 `*GinError` 的错误经 `RenderError` 变成 body `code` `100`、HTTP `599`，`message` 为 `err.Error()`。
 
-Gin 或中间件已经写完的响应保持原样，不要改成 `GinError`。路由未命中是 Gin 的 404。`gin-jwt` 未认证沿用回调给出的 HTTP 401 和它自己的响应体 `{code, message}`。
+Gin 或中间件已经写完的响应保持原样，不要改成 `GinError`。路由未命中是 Gin 的 404。方法不允许同样返回 404 和「不存在」的业务码，不要返回 405。`gin-jwt` 未认证沿用回调给出的 HTTP 401 和它自己的响应体 `{code, message}`。
 
 ## 验收
 
@@ -174,4 +182,4 @@ Gin 或中间件已经写完的响应保持原样，不要改成 `GinError`。�
 
 新 handler：成功是 HTTP 200 加业务对象；`*GinError` 的失败响应是 `{code, message, data}`，且同一条请求日志含 `errors`。普通 `error` 才是业务码 `100`、HTTP `599`。
 
-改已有 HTTP 错误响应时：只改失败分支。成功响应仍是原来的业务对象。`*GinError` 的 HTTP 状态未变成 599。Panic 走 `pkgmiddlewares.Recovery()`，没有另写的恢复中间件。
+改已有 HTTP 响应时：只改当前任务点名的失败分支。成功响应仍是原来的业务对象。用户没有明确要求调整 HTTP 状态时，先询问，不要改现有状态码。用户明确要求按白名单调整时：`400` / `401` / `404` / `409` 保持不变，不要收成 `599`；`405` 改为 `404`；成功 `201` / `202` 改为 `200`，响应体仍是原来的业务对象，不要为了区分首次创建和重放新增字段；`500` / `502` / `503` / `504` 改为 `599`，body `code` 不变。Panic 走 `pkgmiddlewares.Recovery()`，没有另写的恢复中间件。
