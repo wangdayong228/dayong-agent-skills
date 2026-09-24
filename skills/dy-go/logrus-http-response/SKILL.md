@@ -107,15 +107,23 @@ ginutils.RenderResponse(c, nil, err)
 
 `RenderError` 会 `c.Error(err)` 并写入 `error_stack`。公开错误的 HTTP 状态和 body `code` 见「错误码」。
 
-业务失败主路径不用 `c.JSON(4xx/5xx, ...)`。也不只调用 `someGinError.Render(c)`：它只写 JSON，不调用 `c.Error`，日志里没有 `errors` / `stack`。不要把 `err.Error()` 放进响应 `data`。同一次失败不要再写 `logrus.Error`。
+业务失败主路径不用 `c.JSON(4xx/5xx, ...)`。也不只调用 `someGinError.Render(c)`：它只写 JSON，不调用 `c.Error`，日志里没有 `errors` / `stack`。同一次失败不要再写 `logrus.Error`。
+
+`message` 保持公开错误定义时的固定短文案，调用时不要覆盖，也不要用 `WithMessage` 追加本次详情。本次失败详情放进 `data`：先 `WithData(data)`，再交给 `RenderError`。承载详情的参数名是 `data`，不要叫 `message`。没有额外详情时不要设置 `data`，响应里它是 `null`。`data` 只放已可公开的失败检查和事实，不放凭证、私钥、SQL、DSN 或上游响应正文。
 
 `fmt.Errorf("%w", ginErr)` 经 `pkg/errors.Cause` 解不开，会掉成业务码 `100`、HTTP `599`。要保住业务码，`Cause()` 必须仍是 `*GinError`（例如 `pkg/errors.Wrap`）。
 
 ```go
-// 错误：只写 JSON，不进 ApiLog，并把内部错误放进响应
-bimerrors.ErrInvalidInput.WithData(err.Error()).Render(c)
-// 正确
-ginutils.RenderError(c, bimerrors.ErrInvalidInput)
+// 错误：用详情覆盖 message，data 仍是 null
+cloned := *bimerrors.ErrInvalidInput
+cloned.Message = data
+ginutils.RenderError(c, &cloned)
+
+// 错误：详情进了 data，但只 Render，不进 ApiLog
+bimerrors.ErrInvalidInput.WithData(data).Render(c)
+
+// 正确：message 仍是 "invalid input"，详情在 data
+ginutils.RenderError(c, bimerrors.ErrInvalidInput.WithData(data))
 ```
 
 下面这段只用于新 handler。已有 handler 只在任务是改错误响应时改失败分支，成功分支不动。
@@ -123,7 +131,7 @@ ginutils.RenderError(c, bimerrors.ErrInvalidInput)
 ```go
 func OpenCard(c *gin.Context) {
     if err := c.ShouldBindJSON(&req); err != nil {
-        ginutils.RenderError(c, bimerrors.ErrInvalidInput)
+        ginutils.RenderError(c, bimerrors.ErrInvalidInput.WithData(err.Error()))
         return
     }
     orderID, err := service.OpenCard(req)
@@ -145,7 +153,7 @@ func OpenCard(c *gin.Context) {
 - `NewBadRequestGinError(code, message)`：HTTP 400
 - `NewConflictGinError(code, message)`：HTTP 409
 
-一个场景只用一个整数。公开错误定义在同一个包里，handler 只引用这些变量，不在 handler 里新造一个公开错误。`WithMessage` 只追加文案，不改 `code` 和 HTTP 状态。
+一个场景只用一个整数。公开错误定义在同一个包里，handler 只引用这些变量，不在 handler 里新造一个公开错误。定义时的 `message` 是固定短文案；这次失败的详情用 `WithData`，不改 `code`、HTTP 状态和 `message`。
 
 应用只使用这些 HTTP 状态：成功 `200`；参数或校验失败 `400`（`NewBadRequestGinError`）；未认证 `401`（`NewGinError`）；不存在 `404`（`NewGinError`，方法不允许也用 404）；冲突 `409`（`NewConflictGinError`）；应用判定的服务端失败 `599`（`NewBusinessGinError`，或 `NewGinError(599, code, message)`）。
 
@@ -158,19 +166,17 @@ func OpenCard(c *gin.Context) {
 ```go
 // errors/errors.go
 var ErrNotEnoughBalance = ginutils.NewBusinessGinError(120, "insufficient balance")
-
-var ErrLockedBalanceNotEnough = ErrNotEnoughBalance.WithMessage("locked balance is not enough")
 ```
 
 ```go
 // handler
 if err != nil {
-    ginutils.RenderError(c, errors.ErrLockedBalanceNotEnough)
+    ginutils.RenderError(c, errors.ErrNotEnoughBalance.WithData(data))
     return
 }
 ```
 
-`120` 只分配一次。`ErrLockedBalanceNotEnough` 仍是 HTTP 599、body `code` 120。
+`120` 只分配一次。响应仍是 HTTP 599、body `code` 120、`message` 为 `insufficient balance`，本次详情在 `data`。
 
 不是 `*GinError` 的错误经 `RenderError` 变成 body `code` `100`、HTTP `599`，`message` 为 `err.Error()`。
 
