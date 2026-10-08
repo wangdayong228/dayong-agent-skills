@@ -36,6 +36,8 @@ description: Use when starting any conversation — establishes mandatory skill 
 
 **brainstorming 排除判断：** 这个操作有没有设计选择空间？没有 = 跳过，直接执行。
 
+“主动推进、减少确认”不能成为跳过 brainstorming 方案讨论的理由。
+
 ## 记忆
 
 重要讨论结论、用户偏好、纠正过的错误行为，主动建议保存到记忆。
