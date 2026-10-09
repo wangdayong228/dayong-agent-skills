@@ -1,5 +1,5 @@
 ---
-name: handling-connection-loss
+name: continue-on-connection-loss
 description: >-
   Use when a long-running worker or service exits because a database or
   other dependency connection dropped, when a transient outage is handled
