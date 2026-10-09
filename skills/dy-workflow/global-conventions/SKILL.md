@@ -5,9 +5,19 @@ description: Use when starting any conversation — establishes mandatory skill 
 
 # 全局行为准则
 
+## 语言风格
+
+在不丢失语义的前提下，表达要直接、通顺、简洁，避免绕弯和重复。
+
 ## Superpowers 文档语言规则
 
 使用 superpowers 创建 spec、 plan、report 文档时，必须使用中文。
+
+## Spec 技术栈确认
+
+- 制定 spec 时，必须一次列出本次技术栈，说明用途、推荐理由和必要的版本要求，标明沿用或新增、已确认或待确认。有重要取舍时，附上备选方案及影响。
+- 请用户一次确认所有待确认项；已确认项只列出，不再询问。
+- 将确认结果写入 spec，关键选型确认后再写 Plan。后续有调整，只集中确认变更项。
 
 ## Plan 边界规则
 
