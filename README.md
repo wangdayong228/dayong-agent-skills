@@ -26,6 +26,7 @@
 | `superpowers-execution-timing` | 原版 executor 开始后旁路记录自然 step 的真实耗时；不改变粒度或调度 |
 | `consistency-check` | Plan 全部 Task 完成后且即将声称完成/commit/PR，或 spec/plan 等文档已写完并自检、即将请用户批准或 review。沿用已有验证结果，不重跑验证链；文档送审不要求先跑 verification。执行中途与文档撰写过程中不触发。默认要求见 `global-conventions`。 |
 | `fail-fast-with-evidence` | 编写、修改或审查任何语言的错误信息时：先写明失败的检查，并带上这次运行的证据；不得用一句固定的笼统包装替换具体错误。默认要求见 `global-conventions`。 |
+| `handling-connection-loss` | 长期运行的 worker 或服务因数据库或其他依赖连接中断而退出时：结束当前一轮，按已有退避从已持久化状态重入，进程继续运行；完整性错误、冲突、非法输入和启动失败仍退出。 |
 | `logrus-http-response` | Go 服务使用 logrus 与 rainbow-goutils 打日志，或定义 `GinError` 的 body code 与 HTTP 状态时。新 handler 的成功走 `RenderSuccess`；失败走 `RenderError`。业务错误 HTTP 599，参数错误 400，冲突 409。404 与 gin-jwt 的 401 保持框架原样。只加日志时不改响应。不管报警。 |
 | `gin-swagger` | Go Gin 服务需要 Swagger 2.0 文档、swaggo handler 注解、`swag init`、gin-swagger UI、DTO `swaggertype`，或生成文档与接口漂移时。 |
 
@@ -84,6 +85,7 @@ npx skills add wangdayong228/dayong-agent-skills --skill superpowers-plan-assist
 npx skills add wangdayong228/dayong-agent-skills --skill superpowers-execution-timing -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill fail-fast-with-evidence -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill handling-connection-loss -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill logrus-http-response -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill gin-swagger -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
@@ -110,6 +112,7 @@ npx skills add wangdayong228/dayong-agent-skills@superpowers-plan-assistant -g -
 npx skills add wangdayong228/dayong-agent-skills@superpowers-execution-timing -g -y
 npx skills add wangdayong228/dayong-agent-skills@consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills@fail-fast-with-evidence -g -y
+npx skills add wangdayong228/dayong-agent-skills@handling-connection-loss -g -y
 npx skills add wangdayong228/dayong-agent-skills@logrus-http-response -g -y
 npx skills add wangdayong228/dayong-agent-skills@gin-swagger -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handling Connection Loss"
+  short_description: "Keep the process up on connection loss, retry from persisted state, and alert with the existing backoff."
+  default_prompt: "Use handling-connection-loss when a long-running worker would exit because a database or dependency connection dropped."
