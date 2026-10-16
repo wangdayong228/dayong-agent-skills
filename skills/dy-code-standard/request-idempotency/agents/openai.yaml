@@ -1,0 +1,4 @@
+interface:
+  display_name: "请求幂等"
+  short_description: "区分请求重试与新操作，处理幂等键冲突、并发提交和原结果重放"
+  default_prompt: "使用 $request-idempotency 检查写接口何时沿用幂等键、如何返回原结果，以及并发和超时重试会不会重复执行业务。"

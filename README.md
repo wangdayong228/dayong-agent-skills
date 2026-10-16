@@ -27,6 +27,8 @@
 | `consistency-check` | Plan 全部 Task 完成后且即将声称完成/commit/PR，或 spec/plan 等文档已写完并自检、即将请用户批准或 review。沿用已有验证结果，不重跑验证链；文档送审不要求先跑 verification。执行中途与文档撰写过程中不触发。默认要求见 `global-conventions`。 |
 | `fail-fast-with-evidence` | 编写、修改或审查任何语言的错误信息时：先写明失败的检查，并带上这次运行的证据；不得用一句固定的笼统包装替换具体错误。默认要求见 `global-conventions`。 |
 | `continue-on-connection-loss` | 长期运行的 worker 或服务因数据库或其他依赖连接中断而退出时：结束当前一轮，按已有退避从已持久化状态重入，进程继续运行；完整性错误、冲突、非法输入和启动失败仍退出。 |
+| `durable-async-task-lifecycle` | 有持久化状态和外部副作用的异步任务：设计或审查重试、取消、终态、重启恢复与父子任务收尾；状态名及重试策略由项目决定。 |
+| `request-idempotency` | 写接口需要幂等键时：区分同一请求重试与新业务操作，处理参数冲突、并发提交、原结果重放、结果未知和记录过期。 |
 | `logrus-http-response` | Go 服务使用 logrus 与 rainbow-goutils 打日志，或定义 `GinError` 的 body code 与 HTTP 状态时。新 handler 的成功走 `RenderSuccess`；失败走 `RenderError`。业务错误 HTTP 599，参数错误 400，冲突 409。404 与 gin-jwt 的 401 保持框架原样。只加日志时不改响应。不管报警。 |
 | `gin-swagger` | Go Gin 服务需要 Swagger 2.0 文档、swaggo handler 注解、`swag init`、gin-swagger UI、DTO `swaggertype`，或生成文档与接口漂移时。 |
 
@@ -86,6 +88,8 @@ npx skills add wangdayong228/dayong-agent-skills --skill superpowers-execution-t
 npx skills add wangdayong228/dayong-agent-skills --skill consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill fail-fast-with-evidence -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill continue-on-connection-loss -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill durable-async-task-lifecycle -g -y
+npx skills add wangdayong228/dayong-agent-skills --skill request-idempotency -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill logrus-http-response -g -y
 npx skills add wangdayong228/dayong-agent-skills --skill gin-swagger -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
@@ -113,6 +117,8 @@ npx skills add wangdayong228/dayong-agent-skills@superpowers-execution-timing -g
 npx skills add wangdayong228/dayong-agent-skills@consistency-check -g -y
 npx skills add wangdayong228/dayong-agent-skills@fail-fast-with-evidence -g -y
 npx skills add wangdayong228/dayong-agent-skills@continue-on-connection-loss -g -y
+npx skills add wangdayong228/dayong-agent-skills@durable-async-task-lifecycle -g -y
+npx skills add wangdayong228/dayong-agent-skills@request-idempotency -g -y
 npx skills add wangdayong228/dayong-agent-skills@logrus-http-response -g -y
 npx skills add wangdayong228/dayong-agent-skills@gin-swagger -g -y
 # strict-api-extraction 还需单独安装 ego-browser（必需）及 firecrawl 相关 skills（可选）
