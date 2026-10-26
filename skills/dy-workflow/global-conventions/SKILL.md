@@ -46,7 +46,16 @@ description: Use when starting any conversation — establishes mandatory skill 
 
 **brainstorming 排除判断：** 这个操作有没有设计选择空间？没有 = 跳过，直接执行。
 
-“主动推进、减少确认”不能成为跳过 brainstorming 方案讨论的理由。
+## brainstorming 批准闸门
+
+是否进入 brainstorming 按上面的排除判断。一旦进入：
+
+- 未获用户明确批准，不得开始实现。“主动推进、减少确认”不能成为跳过方案讨论或批准的理由。
+- spec 粒度随复杂度变化：
+  - 单文件、取舍很少：可以在对话里给出简短方案（目标、方案、影响范围），用户确认即可，不必落盘。
+  - 跨模块、有重要取舍、涉及资金、权限、数据迁移等高风险：必须写书面 spec 后送审。
+- 只有多步骤实现才需要 `writing-plans`，单步改动批准后直接实现。
+- 例外：用户在本次请求中明确授权跳过确认（如“直接做”、`small-feature-autopilot`）。
 
 ## 记忆
 
