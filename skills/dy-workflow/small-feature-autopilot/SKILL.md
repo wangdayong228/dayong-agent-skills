@@ -77,7 +77,7 @@ Self-review before save. Direction-changing ambiguity → hard blocker. Chat sum
 
 ### S3 — Execute
 
-Follow chosen skill exactly. No continue prompts. Minimal diff; no commit unless asked. Then `finishing-a-development-branch` (pause only if it needs a merge/PR decision).
+Follow chosen skill exactly, including its commit steps. No continue prompts. Minimal diff. Then `finishing-a-development-branch` (pause only if it needs a merge/PR decision).
 
 ### S4 — Verify
 
